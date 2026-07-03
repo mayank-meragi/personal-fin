@@ -107,3 +107,74 @@ export async function parseWithGemini(input: string, categories: Category[]): Pr
       category: validIds.has(e.category) ? e.category : 'other',
     }))
 }
+
+const CHUNK_SIZE = 50
+
+/**
+ * Categorize bank-statement descriptions in bulk. Returns one category id per
+ * input index; unresolved indices come back as "other".
+ */
+export async function categorizeWithGemini(descriptions: string[], categories: Category[]): Promise<string[]> {
+  const key = getConfig('geminiKey')
+  if (!key) throw new NoGeminiKeyError('No Gemini API key configured')
+  const expenseIds = categories.map((c) => c.id)
+  const result: string[] = descriptions.map(() => 'other')
+
+  const categoryLines = categories
+    .map((c) => `- ${c.id} — ${c.name}${c.hints.length ? ` — e.g. ${c.hints.slice(0, 6).join(', ')}` : ''}`)
+    .join('\n')
+
+  for (let start = 0; start < descriptions.length; start += CHUNK_SIZE) {
+    const chunk = descriptions.slice(start, start + CHUNK_SIZE)
+    const prompt = `Classify each Indian bank statement description into one category id from this list:
+${categoryLines}
+Return one object per input with its index (0-based, within this batch) and category id.
+
+Descriptions:
+${chunk.map((d, i) => `${i}: ${d}`).join('\n')}`
+
+    let res: Response
+    try {
+      res = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0,
+            response_mime_type: 'application/json',
+            response_schema: {
+              type: 'ARRAY',
+              items: {
+                type: 'OBJECT',
+                properties: {
+                  index: { type: 'NUMBER' },
+                  category: { type: 'STRING', enum: expenseIds },
+                },
+                required: ['index', 'category'],
+              },
+            },
+          },
+        }),
+      })
+    } catch {
+      throw new GeminiError('Gemini unreachable — are you offline?')
+    }
+    if (!res.ok) throw new GeminiError(`Gemini returned ${res.status}`)
+    const json = await res.json()
+    const text: string | undefined = json.candidates?.[0]?.content?.parts?.[0]?.text
+    if (!text) continue
+    try {
+      const items = JSON.parse(text) as { index: number; category: string }[]
+      const validIds = new Set(expenseIds)
+      for (const item of items) {
+        if (Number.isInteger(item.index) && item.index >= 0 && item.index < chunk.length && validIds.has(item.category)) {
+          result[start + item.index] = item.category
+        }
+      }
+    } catch {
+      // Malformed chunk — leave those rows as "other"
+    }
+  }
+  return result
+}
