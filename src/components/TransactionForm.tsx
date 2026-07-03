@@ -36,11 +36,14 @@ export default function TransactionForm({ initial, onSave, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center bg-slate-900/40 p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-30 flex items-end justify-center bg-slate-900/40 sm:items-center sm:p-4"
+      onClick={onClose}
+    >
       <form
         onSubmit={submit}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md space-y-3 rounded-lg bg-white p-5 shadow-xl"
+        className="max-h-[85vh] w-full max-w-md space-y-3 overflow-y-auto rounded-t-2xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-xl sm:rounded-lg sm:pb-5"
       >
         <h2 className="text-lg font-semibold">{initial ? 'Edit transaction' : 'Add transaction'}</h2>
         <div className="flex gap-2">

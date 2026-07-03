@@ -54,7 +54,7 @@ export default function Onboarding({ expired, onDone }: Props) {
           <li>
             Open{' '}
             <a
-              className="text-sky-600 underline"
+              className="break-all text-sky-600 underline"
               href="https://github.com/settings/personal-access-tokens/new"
               target="_blank"
               rel="noreferrer"

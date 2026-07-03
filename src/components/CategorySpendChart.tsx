@@ -36,7 +36,7 @@ export default function CategorySpendChart({ transactions }: Props) {
 
   return (
     <ResponsiveContainer width="100%" height={Math.max(160, data.length * 40 + 40)}>
-      <BarChart data={data} layout="vertical" margin={{ top: 4, right: 64, left: 8, bottom: 4 }}>
+      <BarChart data={data} layout="vertical" margin={{ top: 4, right: 52, left: 0, bottom: 4 }}>
         <CartesianGrid horizontal={false} stroke={palette.gridline} strokeWidth={1} />
         <XAxis
           type="number"
@@ -48,8 +48,8 @@ export default function CategorySpendChart({ transactions }: Props) {
         <YAxis
           type="category"
           dataKey="name"
-          width={150}
-          tick={{ fill: palette.inkSecondary, fontSize: 12 }}
+          width={118}
+          tick={{ fill: palette.inkSecondary, fontSize: 11 }}
           axisLine={{ stroke: palette.baseline }}
           tickLine={false}
         />

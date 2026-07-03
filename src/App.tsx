@@ -13,11 +13,11 @@ import { initSync, flush } from './lib/sync'
 import { useSyncState } from './hooks/useSyncState'
 
 const navItems = [
-  { to: '/', label: 'Dashboard', end: true },
-  { to: '/transactions', label: 'Transactions' },
-  { to: '/budgets', label: 'Budgets' },
-  { to: '/import', label: 'Import' },
-  { to: '/settings', label: 'Settings' },
+  { to: '/', label: 'Dashboard', icon: '📊', end: true },
+  { to: '/transactions', label: 'Transactions', icon: '📒' },
+  { to: '/budgets', label: 'Budgets', icon: '🎯' },
+  { to: '/import', label: 'Import', icon: '📥' },
+  { to: '/settings', label: 'Settings', icon: '⚙️' },
 ]
 
 export default function App() {
@@ -47,10 +47,10 @@ export default function App() {
   return (
     <HashRouter>
       <div className="min-h-screen bg-slate-50 text-slate-900">
-        <header className="border-b border-slate-200 bg-white">
+        <header className="sticky top-0 z-20 border-b border-slate-200 bg-white">
           <div className="mx-auto flex max-w-5xl items-center gap-6 px-4 py-3">
             <span className="text-lg font-semibold">₹ Tracker</span>
-            <nav className="flex gap-1">
+            <nav className="hidden gap-1 md:flex">
               {navItems.map((item) => (
                 <NavLink
                   key={item.to}
@@ -71,7 +71,7 @@ export default function App() {
             <SyncStatus />
           </div>
         </header>
-        <main className="mx-auto max-w-5xl px-4 py-6">
+        <main className="mx-auto max-w-5xl px-4 py-4 pb-24 md:py-6 md:pb-6">
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/transactions" element={<TransactionsPage />} />
@@ -80,6 +80,27 @@ export default function App() {
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </main>
+        <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
+          <div className="grid grid-cols-5">
+            {navItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) =>
+                  `flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium ${
+                    isActive ? 'text-slate-900' : 'text-slate-400'
+                  }`
+                }
+              >
+                <span className="text-xl leading-none" aria-hidden>
+                  {item.icon}
+                </span>
+                {item.label}
+              </NavLink>
+            ))}
+          </div>
+        </nav>
       </div>
     </HashRouter>
   )

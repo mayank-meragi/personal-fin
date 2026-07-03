@@ -110,7 +110,7 @@ export default function QuickEntry() {
                 {entry.type}
               </button>
               <input
-                className="w-36 rounded border border-slate-300 bg-white px-2 py-1 text-sm"
+                className="min-w-0 flex-1 basis-28 rounded border border-slate-300 bg-white px-2 py-1 text-sm"
                 value={entry.description}
                 onChange={(e) => updateEntry(i, { description: e.target.value })}
               />
@@ -123,7 +123,7 @@ export default function QuickEntry() {
                 onChange={(e) => updateEntry(i, { totalAmount: Number(e.target.value) })}
               />
               <select
-                className="rounded border border-slate-300 bg-white px-2 py-1 text-sm"
+                className="min-w-0 max-w-44 rounded border border-slate-300 bg-white px-2 py-1 text-sm"
                 value={entry.category}
                 onChange={(e) => updateEntry(i, { category: e.target.value })}
               >
