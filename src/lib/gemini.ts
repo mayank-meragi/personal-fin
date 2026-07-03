@@ -45,11 +45,18 @@ Today is ${todayISO()} (IST). Rules:
 - "item P" or "P item" means a single entry with totalAmount = P (e.g. "5 tea" is one tea entry of ₹5).
 - Multiple items may be joined by "and", ",", or newlines — return one object per item.
 - Default type is "expense"; words like salary, received, refund, credited mean "income".
+- Amounts may use Indian shorthand: "23k" = 23000, "1.5L" or "1.5 lakh" = 150000, "2cr" = 20000000.
 - Money moving between the user's OWN accounts is a TRANSFER, not an expense: paying a credit
   card bill, moving money to savings, withdrawing cash. Set type "transfer", account = source
   id, toAccount = destination id (e.g. "paid credit card 3200" transfers from a bank account
   to the credit card; "withdrew 2000" transfers from a bank to cash). Omit either side you
   cannot infer. Transfers use category "transfer".
+- A BALANCE DECLARATION states what is LEFT in an account ("23k left in hdfc",
+  "balance 5000 in cash", "23k left in axis after mutual fund"). Set statedBalance to that
+  amount, account to the account id, type "expense", totalAmount 0 — the app computes the
+  difference from the account's current balance. If a cause is mentioned ("after mutual
+  fund"), use it as the description and pick or invent a fitting category; otherwise
+  description "balance adjustment" and category "other".
 - Resolve relative dates (yesterday, last friday) to YYYY-MM-DD; omit the date field entirely if unstated.
 - Prefer a category id from this list:
 ${categoryLines}
@@ -89,6 +96,7 @@ function buildResponseSchema(accounts: Account[]) {
         categoryName: { type: 'STRING' },
         categoryEmoji: { type: 'STRING' },
         ...(accountEnum ? { account: accountEnum, toAccount: accountEnum } : {}),
+        statedBalance: { type: 'NUMBER' },
         date: { type: 'STRING' },
       },
       required: ['type', 'description', 'totalAmount', 'category'],
@@ -150,14 +158,14 @@ export async function parseWithGemini(
   const validCategoryIds = new Set(categories.map((c) => c.id))
   const validAccountIds = new Set(accounts.map((a) => a.id))
   return parsed
-    .filter(
-      (e): e is ParsedEntry =>
-        typeof e === 'object' &&
-        e !== null &&
-        typeof (e as ParsedEntry).totalAmount === 'number' &&
-        (e as ParsedEntry).totalAmount > 0 &&
-        typeof (e as ParsedEntry).description === 'string',
-    )
+    .filter((e): e is ParsedEntry => {
+      if (typeof e !== 'object' || e === null) return false
+      const entry = e as ParsedEntry
+      if (typeof entry.description !== 'string') return false
+      // Balance declarations carry totalAmount 0 — the app computes the difference
+      if (typeof entry.statedBalance === 'number' && entry.statedBalance >= 0) return true
+      return typeof entry.totalAmount === 'number' && entry.totalAmount > 0
+    })
     .map((e) => {
       const account = e.account && validAccountIds.has(e.account) ? e.account : undefined
       if (e.type === 'transfer') {

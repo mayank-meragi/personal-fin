@@ -38,6 +38,23 @@ export default function QuickEntry() {
     })
   }
 
+  /**
+   * "23k left in hdfc" → the entry's amount becomes the gap between the
+   * account's computed balance and what the user says is actually there.
+   * Overspend → expense; more than expected → income.
+   */
+  function resolveStatedBalance(entry: ParsedEntry): ParsedEntry {
+    if (entry.statedBalance == null || !entry.account) return entry
+    const balances = accountBalances(accounts, history)
+    const delta = (balances[entry.account] ?? 0) - entry.statedBalance
+    return {
+      ...entry,
+      type: delta >= 0 ? 'expense' : 'income',
+      totalAmount: Math.abs(Math.round(delta * 100) / 100),
+      category: entry.category === 'transfer' ? 'other' : entry.category,
+    }
+  }
+
   async function parse() {
     const input = text.trim()
     if (!input || parsing) return
@@ -49,13 +66,17 @@ export default function QuickEntry() {
           balances: accountBalances(accounts, history),
           memory: aiMemory?.summary,
         }),
-      )
+      ).map(resolveStatedBalance)
+      const matched = result.filter((e) => e.statedBalance != null && e.account && e.totalAmount === 0)
+      const remaining = result.filter((e) => !matched.includes(e))
       if (result.length === 0) {
         setNotice('Could not find any transactions in that — try "tea 10" or "2 tea of 5".')
-      } else if (result.some((e) => !e.account || (e.type === 'transfer' && !e.toAccount))) {
+      } else if (matched.length > 0 && remaining.length === 0) {
+        setNotice('That balance already matches — nothing to record.')
+      } else if (remaining.some((e) => !e.account || (e.type === 'transfer' && !e.toAccount))) {
         setNotice('Could not tell which account some items belong to — pick below.')
       }
-      setEntries(result)
+      setEntries(remaining)
     } catch (e) {
       const fallback = withInferredAccounts(quickParse(input, categories))
       setEntries(fallback)
@@ -74,7 +95,14 @@ export default function QuickEntry() {
   }
 
   function updateEntry(index: number, patch: Partial<ParsedEntry>) {
-    setEntries((prev) => prev.map((e, i) => (i === index ? { ...e, ...patch } : e)))
+    setEntries((prev) =>
+      prev.map((e, i) => {
+        if (i !== index) return e
+        const next = { ...e, ...patch }
+        // Re-derive the amount when the account changes under a balance declaration
+        return patch.account !== undefined ? resolveStatedBalance(next) : next
+      }),
+    )
   }
 
   function cycleType(index: number) {
@@ -256,6 +284,12 @@ export default function QuickEntry() {
               {entry.quantity && entry.unitAmount ? (
                 <span className="text-xs text-slate-500">
                   {entry.quantity} × {formatINRExact(entry.unitAmount)}
+                </span>
+              ) : null}
+              {entry.statedBalance != null && entry.account ? (
+                <span className="basis-full text-xs text-sky-700">
+                  ↳ leaves {formatINRExact(entry.statedBalance)} in{' '}
+                  {accounts.find((a) => a.id === entry.account)?.name ?? entry.account}
                 </span>
               ) : null}
               <button

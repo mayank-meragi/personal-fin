@@ -79,6 +79,11 @@ export interface ParsedEntry {
   account?: string
   /** Destination account — transfers only */
   toAccount?: string
+  /**
+   * Set when the user declared what's LEFT in an account ("23k left in hdfc").
+   * The app turns the difference from the computed balance into this entry's amount.
+   */
+  statedBalance?: number
   /** ISO date; defaults to today when absent */
   date?: string
 }
