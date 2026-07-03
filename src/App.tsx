@@ -1,9 +1,16 @@
+import { useEffect, useState } from 'react'
 import { HashRouter, NavLink, Route, Routes } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import DashboardPage from './pages/DashboardPage'
 import TransactionsPage from './pages/TransactionsPage'
 import BudgetsPage from './pages/BudgetsPage'
 import ImportPage from './pages/ImportPage'
 import SettingsPage from './pages/SettingsPage'
+import Onboarding from './components/Onboarding'
+import SyncStatus from './components/SyncStatus'
+import { isConfigured } from './lib/cache'
+import { initSync, flush } from './lib/sync'
+import { useSyncState } from './hooks/useSyncState'
 
 const navItems = [
   { to: '/', label: 'Dashboard', end: true },
@@ -14,6 +21,29 @@ const navItems = [
 ]
 
 export default function App() {
+  const [configured, setConfigured] = useState(isConfigured)
+  const sync = useSyncState()
+  const queryClient = useQueryClient()
+
+  useEffect(() => {
+    initSync()
+  }, [])
+
+  if (!configured || sync.status === 'auth-error') {
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-900">
+        <Onboarding
+          expired={sync.status === 'auth-error'}
+          onDone={() => {
+            setConfigured(true)
+            void queryClient.invalidateQueries()
+            void flush()
+          }}
+        />
+      </div>
+    )
+  }
+
   return (
     <HashRouter>
       <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -38,6 +68,7 @@ export default function App() {
                 </NavLink>
               ))}
             </nav>
+            <SyncStatus />
           </div>
         </header>
         <main className="mx-auto max-w-5xl px-4 py-6">
