@@ -55,6 +55,12 @@ export default function DashboardPage() {
 
       {accounts.length > 0 && (
         <div className="flex gap-3 overflow-x-auto pb-1">
+          <div className="min-w-36 shrink-0 rounded-lg bg-slate-900 px-4 py-3 text-white">
+            <p className="text-xs text-slate-300">Total balance</p>
+            <p className="mt-1 text-lg font-semibold">
+              {formatINR(accounts.reduce((sum, acc) => sum + (balances[acc.id] ?? 0), 0))}
+            </p>
+          </div>
           {accounts.map((acc) => (
             <div key={acc.id} className="min-w-36 shrink-0 rounded-lg border border-slate-200 bg-white px-4 py-3">
               <p className="flex items-center gap-1.5 text-xs text-slate-500">

@@ -3,8 +3,9 @@ import { useQueryClient } from '@tanstack/react-query'
 import { clearFileCache, getConfig, setConfig } from '../lib/cache'
 import { flush, resetAllData } from '../lib/sync'
 import { useSyncState } from '../hooks/useSyncState'
-import { makeAccountId, useAccounts } from '../hooks/useData'
+import { makeAccountId, useAccounts, useFileQuery } from '../hooks/useData'
 import { accountTypeEmoji, accountTypeLabel } from '../lib/accounts'
+import { AI_MEMORY_PATH, emptyAiMemory, type AiMemoryFile } from '../lib/aiMemory'
 import type { AccountType } from '../lib/types'
 
 export default function SettingsPage() {
@@ -17,6 +18,7 @@ export default function SettingsPage() {
   const [newType, setNewType] = useState<AccountType>('bank')
   const [newBalance, setNewBalance] = useState('')
   const [resetting, setResetting] = useState(false)
+  const { data: aiMemory } = useFileQuery<AiMemoryFile>(AI_MEMORY_PATH, emptyAiMemory)
 
   const repo = getConfig('dataRepo')
   const branch = getConfig('dataBranch') ?? 'data'
@@ -183,6 +185,35 @@ export default function SettingsPage() {
             Save
           </button>
         </div>
+      </section>
+
+      <section className="space-y-2 rounded-lg border border-slate-200 bg-white p-4">
+        <h2 className="text-sm font-semibold">AI memory</h2>
+        <p className="text-sm text-slate-600">
+          What the AI has learned about your spending, regenerated after quick-entry saves and
+          fed into every parse to improve classification.
+        </p>
+        {aiMemory?.summary ? (
+          <>
+            <p className="whitespace-pre-line rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              {aiMemory.summary}
+            </p>
+            <p className="text-xs text-slate-400">
+              Updated{' '}
+              {new Date(aiMemory.updatedAt).toLocaleString('en-IN', {
+                day: 'numeric',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}{' '}
+              · based on {aiMemory.txCount} transactions
+            </p>
+          </>
+        ) : (
+          <p className="text-sm text-slate-400">
+            Nothing yet — it builds up as you save transactions through quick entry.
+          </p>
+        )}
       </section>
 
       <section className="space-y-2 rounded-lg border border-red-200 bg-white p-4">
