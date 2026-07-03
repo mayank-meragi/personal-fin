@@ -1,18 +1,30 @@
 import { useState } from 'react'
-import { useAccounts, useCategories } from '../hooks/useData'
+import { useQueryClient } from '@tanstack/react-query'
+import { fileQueryKey, useAccounts, useCategories, useFileQuery } from '../hooks/useData'
 import { makeTransaction, useAllTransactions, useTransactionMutations } from '../hooks/useTransactions'
 import { hasGeminiKey, parseWithGemini, GeminiError, NoGeminiKeyError } from '../lib/gemini'
 import { quickParse } from '../lib/quickParse'
-import { inferAccount } from '../lib/accounts'
+import { accountBalances, inferAccount } from '../lib/accounts'
+import { AI_MEMORY_PATH, emptyAiMemory, maybeRefreshAiMemory, type AiMemoryFile } from '../lib/aiMemory'
 import { todayISO } from '../lib/dates'
 import { formatINRExact } from '../lib/money'
-import type { ParsedEntry } from '../lib/types'
+import type { ParsedEntry, TransactionType } from '../lib/types'
+
+const TYPE_CYCLE: TransactionType[] = ['expense', 'income', 'transfer']
+
+const typeStyles: Record<TransactionType, string> = {
+  expense: 'bg-slate-200 text-slate-700',
+  income: 'bg-emerald-100 text-emerald-700',
+  transfer: 'bg-sky-100 text-sky-700',
+}
 
 export default function QuickEntry() {
   const { categories, addCategory } = useCategories()
   const { accounts } = useAccounts()
   const { transactions: history } = useAllTransactions()
   const { saveAll } = useTransactionMutations()
+  const { data: aiMemory } = useFileQuery<AiMemoryFile>(AI_MEMORY_PATH, emptyAiMemory)
+  const queryClient = useQueryClient()
   const [text, setText] = useState('')
   const [entries, setEntries] = useState<ParsedEntry[]>([])
   const [parsing, setParsing] = useState(false)
@@ -21,8 +33,8 @@ export default function QuickEntry() {
   function withInferredAccounts(parsed: ParsedEntry[]): ParsedEntry[] {
     return parsed.map((e) => {
       if (e.account) return e
-      if (accounts.length === 1) return { ...e, account: accounts[0].id }
-      return { ...e, account: inferAccount(e.description, history) }
+      if (accounts.length === 1 && e.type !== 'transfer') return { ...e, account: accounts[0].id }
+      return { ...e, account: e.type === 'transfer' ? undefined : inferAccount(e.description, history) }
     })
   }
 
@@ -32,11 +44,16 @@ export default function QuickEntry() {
     setParsing(true)
     setNotice(null)
     try {
-      const result = withInferredAccounts(await parseWithGemini(input, categories, accounts))
+      const result = withInferredAccounts(
+        await parseWithGemini(input, categories, accounts, {
+          balances: accountBalances(accounts, history),
+          memory: aiMemory?.summary,
+        }),
+      )
       if (result.length === 0) {
         setNotice('Could not find any transactions in that — try "tea 10" or "2 tea of 5".')
-      } else if (result.some((e) => !e.account)) {
-        setNotice('Could not tell which account some items belong to — pick one below.')
+      } else if (result.some((e) => !e.account || (e.type === 'transfer' && !e.toAccount))) {
+        setNotice('Could not tell which account some items belong to — pick below.')
       }
       setEntries(result)
     } catch (e) {
@@ -60,22 +77,39 @@ export default function QuickEntry() {
     setEntries((prev) => prev.map((e, i) => (i === index ? { ...e, ...patch } : e)))
   }
 
+  function cycleType(index: number) {
+    setEntries((prev) =>
+      prev.map((e, i) => {
+        if (i !== index) return e
+        const next = TYPE_CYCLE[(TYPE_CYCLE.indexOf(e.type) + 1) % TYPE_CYCLE.length]
+        return {
+          ...e,
+          type: next,
+          category: next === 'transfer' ? 'transfer' : e.category === 'transfer' ? 'other' : e.category,
+          toAccount: next === 'transfer' ? e.toAccount : undefined,
+        }
+      }),
+    )
+  }
+
   function removeEntry(index: number) {
     setEntries((prev) => prev.filter((_, i) => i !== index))
   }
 
   const knownCategoryIds = new Set(categories.map((c) => c.id))
-  const missingAccount = accounts.length > 0 && entries.some((e) => !e.account)
+  const missingAccount =
+    accounts.length > 0 &&
+    entries.some((e) => !e.account || (e.type === 'transfer' && (!e.toAccount || e.toAccount === e.account)))
 
   function saveEntries() {
     // Create any categories the AI invented before saving transactions that use them
     for (const e of entries) {
-      if (!knownCategoryIds.has(e.category)) {
+      if (e.type !== 'transfer' && !knownCategoryIds.has(e.category)) {
         addCategory({
           id: e.category,
           name: e.categoryName ?? e.category,
           emoji: e.categoryEmoji ?? '🏷️',
-          type: e.type,
+          type: e.type === 'income' ? 'income' : 'expense',
           hints: [e.description],
         })
       }
@@ -85,8 +119,9 @@ export default function QuickEntry() {
         type: e.type,
         amount: e.totalAmount,
         date: e.date && /^\d{4}-\d{2}-\d{2}$/.test(e.date) ? e.date : todayISO(),
-        category: e.category,
+        category: e.type === 'transfer' ? 'transfer' : e.category,
         account: e.account,
+        toAccount: e.type === 'transfer' ? e.toAccount : undefined,
         note: e.description,
         quantity: e.quantity,
         source: 'ai',
@@ -96,6 +131,10 @@ export default function QuickEntry() {
     setEntries([])
     setText('')
     setNotice(`Saved ${txs.length} transaction${txs.length > 1 ? 's' : ''}.`)
+    // Update the AI's memory of this user in the background
+    void maybeRefreshAiMemory([...history, ...txs], categories, accounts).then((next) => {
+      if (next) queryClient.setQueryData(fileQueryKey(AI_MEMORY_PATH), next)
+    })
   }
 
   return (
@@ -105,7 +144,7 @@ export default function QuickEntry() {
           className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
           placeholder={
             hasGeminiKey()
-              ? 'Quick add: "2 tea of 5", "coffee 30 and auto 60", "salary 90000 yesterday"…'
+              ? 'Quick add: "2 tea of 5", "paid credit card 3200", "salary 90000 yesterday"…'
               : 'Quick add: "tea 10", "coffee 30 and auto 60"…'
           }
           value={text}
@@ -130,11 +169,9 @@ export default function QuickEntry() {
             <div key={i} className="flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
               <button
                 type="button"
-                onClick={() => updateEntry(i, { type: entry.type === 'expense' ? 'income' : 'expense' })}
-                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                  entry.type === 'income' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'
-                }`}
-                title="Toggle expense/income"
+                onClick={() => cycleType(i)}
+                className={`rounded-full px-2 py-0.5 text-xs font-medium ${typeStyles[entry.type]}`}
+                title="Toggle expense/income/transfer"
               >
                 {entry.type}
               </button>
@@ -151,24 +188,26 @@ export default function QuickEntry() {
                 value={entry.totalAmount}
                 onChange={(e) => updateEntry(i, { totalAmount: Number(e.target.value) })}
               />
-              <select
-                className="min-w-0 max-w-44 rounded border border-slate-300 bg-white px-2 py-1 text-sm"
-                value={entry.category}
-                onChange={(e) => updateEntry(i, { category: e.target.value })}
-              >
-                {!knownCategoryIds.has(entry.category) && (
-                  <option value={entry.category}>
-                    {entry.categoryEmoji ?? '🏷️'} {entry.categoryName ?? entry.category} (new)
-                  </option>
-                )}
-                {categories
-                  .filter((c) => c.type === entry.type)
-                  .map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.emoji} {c.name}
+              {entry.type !== 'transfer' && (
+                <select
+                  className="min-w-0 max-w-44 rounded border border-slate-300 bg-white px-2 py-1 text-sm"
+                  value={entry.category}
+                  onChange={(e) => updateEntry(i, { category: e.target.value })}
+                >
+                  {!knownCategoryIds.has(entry.category) && (
+                    <option value={entry.category}>
+                      {entry.categoryEmoji ?? '🏷️'} {entry.categoryName ?? entry.category} (new)
                     </option>
-                  ))}
-              </select>
+                  )}
+                  {categories
+                    .filter((c) => c.type === entry.type)
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.emoji} {c.name}
+                      </option>
+                    ))}
+                </select>
+              )}
               {accounts.length > 0 && (
                 <select
                   className={`min-w-0 max-w-40 rounded border bg-white px-2 py-1 text-sm ${
@@ -177,13 +216,36 @@ export default function QuickEntry() {
                   value={entry.account ?? ''}
                   onChange={(e) => updateEntry(i, { account: e.target.value || undefined })}
                 >
-                  <option value="">Account…</option>
+                  <option value="">{entry.type === 'transfer' ? 'From account…' : 'Account…'}</option>
                   {accounts.map((a) => (
                     <option key={a.id} value={a.id}>
                       {a.name}
                     </option>
                   ))}
                 </select>
+              )}
+              {entry.type === 'transfer' && accounts.length > 0 && (
+                <>
+                  <span className="text-xs text-slate-400">→</span>
+                  <select
+                    className={`min-w-0 max-w-40 rounded border bg-white px-2 py-1 text-sm ${
+                      entry.toAccount && entry.toAccount !== entry.account
+                        ? 'border-slate-300'
+                        : 'border-red-400 text-red-600'
+                    }`}
+                    value={entry.toAccount ?? ''}
+                    onChange={(e) => updateEntry(i, { toAccount: e.target.value || undefined })}
+                  >
+                    <option value="">To account…</option>
+                    {accounts
+                      .filter((a) => a.id !== entry.account)
+                      .map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name}
+                        </option>
+                      ))}
+                  </select>
+                </>
               )}
               <input
                 className="rounded border border-slate-300 bg-white px-2 py-1 text-sm"
@@ -206,7 +268,7 @@ export default function QuickEntry() {
             </div>
           ))}
           <div className="flex items-center justify-end gap-2">
-            {missingAccount && <span className="text-xs text-red-600">Pick an account for the highlighted items</span>}
+            {missingAccount && <span className="text-xs text-red-600">Pick accounts for the highlighted items</span>}
             <button
               type="button"
               onClick={() => setEntries([])}

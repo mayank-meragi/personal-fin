@@ -42,6 +42,23 @@ describe('accountBalances', () => {
     const balances = accountBalances([acc('card', 0)], [tx({ account: 'card', amount: 2500 })])
     expect(balances.card).toBe(-2500)
   })
+
+  it('moves money between accounts on transfers', () => {
+    const balances = accountBalances(
+      [acc('hdfc', 10000), acc('card', -3200)],
+      [tx({ type: 'transfer', account: 'hdfc', toAccount: 'card', amount: 3200 })],
+    )
+    expect(balances.hdfc).toBe(6800)
+    expect(balances.card).toBe(0)
+  })
+
+  it('applies one-sided transfers when only one side is known', () => {
+    const balances = accountBalances(
+      [acc('hdfc', 1000)],
+      [tx({ type: 'transfer', account: 'hdfc', toAccount: 'unknown', amount: 300 })],
+    )
+    expect(balances.hdfc).toBe(700)
+  })
 })
 
 describe('inferAccount', () => {

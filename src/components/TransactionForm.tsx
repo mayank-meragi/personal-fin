@@ -19,8 +19,10 @@ export default function TransactionForm({ initial, onSave, onClose }: Props) {
   const [date, setDate] = useState(initial?.date ?? todayISO())
   const [category, setCategory] = useState(initial?.category ?? 'other')
   const [account, setAccount] = useState(initial?.account ?? accounts[0]?.id ?? '')
+  const [toAccount, setToAccount] = useState(initial?.toAccount ?? '')
   const [note, setNote] = useState(initial?.note ?? '')
 
+  const isTransfer = type === 'transfer'
   const typeCategories = categories.filter((c) => c.type === type)
 
   function submit(e: React.FormEvent) {
@@ -28,9 +30,11 @@ export default function TransactionForm({ initial, onSave, onClose }: Props) {
     const parsed = Number(amount)
     if (!Number.isFinite(parsed) || parsed <= 0) return
     if (accounts.length > 0 && !account) return
+    if (isTransfer && (!toAccount || toAccount === account)) return
     const catValid = typeCategories.some((c) => c.id === category)
-    const cat = catValid ? category : (typeCategories[0]?.id ?? 'other')
+    const cat = isTransfer ? 'transfer' : catValid ? category : (typeCategories[0]?.id ?? 'other')
     const acc = account || undefined
+    const toAcc = isTransfer ? toAccount : undefined
     if (initial) {
       onSave({
         ...initial,
@@ -39,11 +43,23 @@ export default function TransactionForm({ initial, onSave, onClose }: Props) {
         date,
         category: cat,
         account: acc,
+        toAccount: toAcc,
         note,
         updatedAt: new Date().toISOString(),
       })
     } else {
-      onSave(makeTransaction({ type, amount: parsed, date, category: cat, account: acc, note, source: 'manual' }))
+      onSave(
+        makeTransaction({
+          type,
+          amount: parsed,
+          date,
+          category: cat,
+          account: acc,
+          toAccount: toAcc,
+          note,
+          source: 'manual',
+        }),
+      )
     }
     onClose()
   }
@@ -60,7 +76,7 @@ export default function TransactionForm({ initial, onSave, onClose }: Props) {
       >
         <h2 className="text-lg font-semibold">{initial ? 'Edit transaction' : 'Add transaction'}</h2>
         <div className="flex gap-2">
-          {(['expense', 'income'] as const).map((t) => (
+          {(['expense', 'income', 'transfer'] as const).map((t) => (
             <button
               key={t}
               type="button"
@@ -96,23 +112,25 @@ export default function TransactionForm({ initial, onSave, onClose }: Props) {
             onChange={(e) => setDate(e.target.value)}
           />
         </label>
-        <label className="block text-sm">
-          <span className="font-medium">Category</span>
-          <select
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-          >
-            {typeCategories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.emoji} {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        {!isTransfer && (
+          <label className="block text-sm">
+            <span className="font-medium">Category</span>
+            <select
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              {typeCategories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.emoji} {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {accounts.length > 0 && (
           <label className="block text-sm">
-            <span className="font-medium">Account</span>
+            <span className="font-medium">{isTransfer ? 'From account' : 'Account'}</span>
             <select
               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
               value={account}
@@ -125,6 +143,26 @@ export default function TransactionForm({ initial, onSave, onClose }: Props) {
                   {a.name}
                 </option>
               ))}
+            </select>
+          </label>
+        )}
+        {isTransfer && accounts.length > 0 && (
+          <label className="block text-sm">
+            <span className="font-medium">To account</span>
+            <select
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+              value={toAccount}
+              required
+              onChange={(e) => setToAccount(e.target.value)}
+            >
+              {!toAccount && <option value="">Select an account…</option>}
+              {accounts
+                .filter((a) => a.id !== account)
+                .map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
             </select>
           </label>
         )}

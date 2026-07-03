@@ -107,7 +107,7 @@ export function useTransactionMutations() {
 
 export function makeTransaction(
   fields: Pick<Transaction, 'type' | 'amount' | 'date' | 'category' | 'note' | 'source'> &
-    Partial<Pick<Transaction, 'account' | 'quantity' | 'importHash'>>,
+    Partial<Pick<Transaction, 'account' | 'toAccount' | 'quantity' | 'importHash'>>,
 ): Transaction {
   const now = new Date().toISOString()
   return {

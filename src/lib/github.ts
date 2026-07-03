@@ -94,6 +94,18 @@ export async function putFile(
   return { sha: json.content.sha }
 }
 
+/** Delete a file on the data branch. Requires the current blob sha. */
+export async function deleteFile(path: string, sha: string, message: string): Promise<void> {
+  const { token, repo, branch } = requireAuth()
+  const res = await request(`${API}/repos/${repo}/contents/${path}`, token, {
+    method: 'DELETE',
+    body: JSON.stringify({ message, sha, branch }),
+  })
+  if (!res.ok && res.status !== 404) {
+    throw new GitHubApiError(res.status, `DELETE ${path} failed: ${res.status}`)
+  }
+}
+
 /** List a directory on the data branch. Returns [] if it does not exist. */
 export async function listDir(path: string): Promise<{ name: string; sha: string }[]> {
   const { token, repo, branch } = requireAuth()

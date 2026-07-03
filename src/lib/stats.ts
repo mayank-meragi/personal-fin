@@ -10,8 +10,9 @@ export function totals(txs: Transaction[]): MonthTotals {
   let income = 0
   let expense = 0
   for (const t of txs) {
+    // Transfers move money between own accounts — neither income nor expense
     if (t.type === 'income') income += t.amount
-    else expense += t.amount
+    else if (t.type === 'expense') expense += t.amount
   }
   return { income, expense, net: income - expense }
 }

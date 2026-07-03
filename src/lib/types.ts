@@ -1,4 +1,4 @@
-export type TransactionType = 'expense' | 'income'
+export type TransactionType = 'expense' | 'income' | 'transfer'
 export type TransactionSource = 'manual' | 'ai' | 'csv'
 export type AccountType = 'bank' | 'credit-card' | 'cash'
 
@@ -24,8 +24,11 @@ export interface Transaction {
   date: string
   /** Category id from categories.json */
   category: string
-  /** Account id from accounts.json; absent on transactions from before accounts existed */
+  /** Account id from accounts.json; absent on transactions from before accounts existed.
+   *  For transfers this is the source account. */
   account?: string
+  /** Destination account — transfers only */
+  toAccount?: string
   note: string
   quantity?: number
   source: TransactionSource
@@ -72,8 +75,10 @@ export interface ParsedEntry {
   /** Set when the AI invented a category that doesn't exist yet */
   categoryName?: string
   categoryEmoji?: string
-  /** Account id; undefined means the user must pick one before saving */
+  /** Account id (source for transfers); undefined means the user must pick one before saving */
   account?: string
+  /** Destination account — transfers only */
+  toAccount?: string
   /** ISO date; defaults to today when absent */
   date?: string
 }

@@ -23,15 +23,18 @@ export default function TransactionList({ transactions, onEdit, onDelete }: Prop
   return (
     <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
       {sorted.map((tx) => {
+        const isTransfer = tx.type === 'transfer'
         const cat = catById.get(tx.category)
+        const accName = tx.account ? accById.get(tx.account)?.name : undefined
+        const toAccName = tx.toAccount ? accById.get(tx.toAccount)?.name : undefined
         return (
           <li key={tx.id} className="flex items-center gap-3 px-4 py-2.5">
-            <span className="text-xl" title={cat?.name}>
-              {cat?.emoji ?? '📦'}
+            <span className="text-xl" title={isTransfer ? 'Transfer' : cat?.name}>
+              {isTransfer ? '🔁' : (cat?.emoji ?? '📦')}
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">
-                {tx.note || cat?.name || tx.category}
+                {tx.note || (isTransfer ? 'Transfer' : cat?.name || tx.category)}
                 {tx.quantity && tx.quantity > 1 ? ` ×${tx.quantity}` : ''}
               </p>
               <p className="text-xs text-slate-500">
@@ -40,17 +43,18 @@ export default function TransactionList({ transactions, onEdit, onDelete }: Prop
                   month: 'short',
                 })}
                 {' · '}
-                {cat?.name ?? tx.category}
-                {tx.account && accById.has(tx.account) ? ` · ${accById.get(tx.account)!.name}` : ''}
+                {isTransfer
+                  ? `${accName ?? '?'} → ${toAccName ?? '?'}`
+                  : `${cat?.name ?? tx.category}${accName ? ` · ${accName}` : ''}`}
                 {tx.source !== 'manual' ? ` · ${tx.source}` : ''}
               </p>
             </div>
             <span
               className={`text-sm font-semibold ${
-                tx.type === 'income' ? 'text-emerald-600' : 'text-slate-900'
+                tx.type === 'income' ? 'text-emerald-600' : isTransfer ? 'text-slate-500' : 'text-slate-900'
               }`}
             >
-              {tx.type === 'income' ? '+' : '−'}
+              {tx.type === 'income' ? '+' : isTransfer ? '' : '−'}
               {formatINRExact(tx.amount)}
             </span>
             {onEdit && (

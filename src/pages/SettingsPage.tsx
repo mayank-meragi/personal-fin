@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { clearFileCache, getConfig, setConfig } from '../lib/cache'
-import { flush } from '../lib/sync'
+import { flush, resetAllData } from '../lib/sync'
 import { useSyncState } from '../hooks/useSyncState'
 import { makeAccountId, useAccounts } from '../hooks/useData'
 import { accountTypeEmoji, accountTypeLabel } from '../lib/accounts'
@@ -16,6 +16,7 @@ export default function SettingsPage() {
   const [newName, setNewName] = useState('')
   const [newType, setNewType] = useState<AccountType>('bank')
   const [newBalance, setNewBalance] = useState('')
+  const [resetting, setResetting] = useState(false)
 
   const repo = getConfig('dataRepo')
   const branch = getConfig('dataBranch') ?? 'data'
@@ -182,6 +183,35 @@ export default function SettingsPage() {
             Save
           </button>
         </div>
+      </section>
+
+      <section className="space-y-2 rounded-lg border border-red-200 bg-white p-4">
+        <h2 className="text-sm font-semibold text-red-700">Danger zone</h2>
+        <p className="text-sm text-slate-600">
+          Reset deletes every transaction, all accounts, budgets, and the AI memory from the
+          data repo, and restores default categories. Your GitHub and Gemini keys stay. Old
+          data remains in the repo's git history until you delete the repo itself.
+        </p>
+        <button
+          type="button"
+          disabled={resetting}
+          onClick={async () => {
+            if (!confirm('Delete ALL data — every transaction, account, budget, and AI memory?')) return
+            if (prompt('This cannot be undone from the app. Type DELETE to confirm:') !== 'DELETE') return
+            setResetting(true)
+            try {
+              await resetAllData()
+              queryClient.clear()
+              location.reload()
+            } catch (e) {
+              note(`Reset failed: ${e instanceof Error ? e.message : e}`)
+              setResetting(false)
+            }
+          }}
+          className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        >
+          {resetting ? 'Resetting…' : 'Reset everything'}
+        </button>
       </section>
 
       {saved && <p className="text-sm text-emerald-700">{saved}</p>}

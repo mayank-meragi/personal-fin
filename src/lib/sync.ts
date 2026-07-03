@@ -5,6 +5,7 @@ import {
   getDirtyPaths,
   markDirty,
   clearDirty,
+  clearFileCache,
   isConfigured,
 } from './cache'
 import { mergeFile } from './merge'
@@ -187,6 +188,25 @@ export async function ensureSeedFiles(): Promise<void> {
     )
     setCachedFile(seed.path, seed.content, sha)
   }
+}
+
+/**
+ * Delete every transaction file and the AI memory, reset seed files to their
+ * defaults (accounts become empty, so account setup runs again), and wipe the
+ * local cache. The data repo's git history still contains the old commits.
+ */
+export async function resetAllData(): Promise<void> {
+  const txFiles = await gh.listDir('transactions')
+  for (const f of txFiles) {
+    await gh.deleteFile(`transactions/${f.name}`, f.sha, `Reset: delete transactions/${f.name}`)
+  }
+  const memory = await gh.getFile('ai-memory.json')
+  if (memory) await gh.deleteFile('ai-memory.json', memory.sha, 'Reset: delete ai-memory.json')
+  for (const seed of SEED_FILES) {
+    const remote = await gh.getFile(seed.path)
+    await gh.putFile(seed.path, JSON.stringify(seed.content, null, 2), remote?.sha ?? null, `Reset ${seed.path}`)
+  }
+  clearFileCache()
 }
 
 let initialized = false

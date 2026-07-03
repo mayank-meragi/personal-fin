@@ -12,11 +12,16 @@ export const accountTypeLabel: Record<AccountType, string> = {
   cash: 'Cash',
 }
 
-/** Current balance per account id: starting balance + income − expense */
+/** Current balance per account id: starting balance + income − expense ± transfers */
 export function accountBalances(accounts: Account[], transactions: Transaction[]): Record<string, number> {
   const balances: Record<string, number> = {}
   for (const acc of accounts) balances[acc.id] = acc.startingBalance
   for (const tx of transactions) {
+    if (tx.type === 'transfer') {
+      if (tx.account && tx.account in balances) balances[tx.account] -= tx.amount
+      if (tx.toAccount && tx.toAccount in balances) balances[tx.toAccount] += tx.amount
+      continue
+    }
     if (!tx.account || !(tx.account in balances)) continue
     balances[tx.account] += tx.type === 'income' ? tx.amount : -tx.amount
   }
