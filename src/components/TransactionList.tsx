@@ -1,4 +1,4 @@
-import { useCategories } from '../hooks/useData'
+import { useAccounts, useCategories } from '../hooks/useData'
 import { formatINRExact } from '../lib/money'
 import type { Transaction } from '../lib/types'
 
@@ -10,7 +10,9 @@ interface Props {
 
 export default function TransactionList({ transactions, onEdit, onDelete }: Props) {
   const { categories } = useCategories()
+  const { accounts } = useAccounts()
   const catById = new Map(categories.map((c) => [c.id, c]))
+  const accById = new Map(accounts.map((a) => [a.id, a]))
 
   if (transactions.length === 0) {
     return <p className="py-8 text-center text-sm text-slate-500">No transactions this month yet.</p>
@@ -39,6 +41,7 @@ export default function TransactionList({ transactions, onEdit, onDelete }: Prop
                 })}
                 {' · '}
                 {cat?.name ?? tx.category}
+                {tx.account && accById.has(tx.account) ? ` · ${accById.get(tx.account)!.name}` : ''}
                 {tx.source !== 'manual' ? ` · ${tx.source}` : ''}
               </p>
             </div>

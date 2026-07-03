@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useCategories } from '../hooks/useData'
+import { useAccounts, useCategories } from '../hooks/useData'
 import { makeTransaction } from '../hooks/useTransactions'
 import { todayISO } from '../lib/dates'
 import type { Transaction, TransactionType } from '../lib/types'
@@ -13,10 +13,12 @@ interface Props {
 
 export default function TransactionForm({ initial, onSave, onClose }: Props) {
   const { categories } = useCategories()
+  const { accounts } = useAccounts()
   const [type, setType] = useState<TransactionType>(initial?.type ?? 'expense')
   const [amount, setAmount] = useState(initial ? String(initial.amount) : '')
   const [date, setDate] = useState(initial?.date ?? todayISO())
   const [category, setCategory] = useState(initial?.category ?? 'other')
+  const [account, setAccount] = useState(initial?.account ?? accounts[0]?.id ?? '')
   const [note, setNote] = useState(initial?.note ?? '')
 
   const typeCategories = categories.filter((c) => c.type === type)
@@ -25,12 +27,23 @@ export default function TransactionForm({ initial, onSave, onClose }: Props) {
     e.preventDefault()
     const parsed = Number(amount)
     if (!Number.isFinite(parsed) || parsed <= 0) return
+    if (accounts.length > 0 && !account) return
     const catValid = typeCategories.some((c) => c.id === category)
     const cat = catValid ? category : (typeCategories[0]?.id ?? 'other')
+    const acc = account || undefined
     if (initial) {
-      onSave({ ...initial, type, amount: parsed, date, category: cat, note, updatedAt: new Date().toISOString() })
+      onSave({
+        ...initial,
+        type,
+        amount: parsed,
+        date,
+        category: cat,
+        account: acc,
+        note,
+        updatedAt: new Date().toISOString(),
+      })
     } else {
-      onSave(makeTransaction({ type, amount: parsed, date, category: cat, note, source: 'manual' }))
+      onSave(makeTransaction({ type, amount: parsed, date, category: cat, account: acc, note, source: 'manual' }))
     }
     onClose()
   }
@@ -97,6 +110,24 @@ export default function TransactionForm({ initial, onSave, onClose }: Props) {
             ))}
           </select>
         </label>
+        {accounts.length > 0 && (
+          <label className="block text-sm">
+            <span className="font-medium">Account</span>
+            <select
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+              value={account}
+              required
+              onChange={(e) => setAccount(e.target.value)}
+            >
+              {!account && <option value="">Select an account…</option>}
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="block text-sm">
           <span className="font-medium">Note</span>
           <input

@@ -1,6 +1,6 @@
 import { getConfig } from './cache'
 import { todayISO } from './dates'
-import type { Category, ParsedEntry } from './types'
+import type { Account, Category, ParsedEntry } from './types'
 
 export class NoGeminiKeyError extends Error {}
 export class GeminiError extends Error {}
@@ -14,10 +14,19 @@ export function hasGeminiKey(): boolean {
   return Boolean(getConfig('geminiKey'))
 }
 
-function buildSystemPrompt(categories: Category[]): string {
+/** "Kids School Fees" → "kids-school-fees" */
+export function toKebabId(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+function buildSystemPrompt(categories: Category[], accounts: Account[]): string {
   const categoryLines = categories
     .map((c) => `- ${c.id} — ${c.name} (${c.type})${c.hints.length ? ` — e.g. ${c.hints.slice(0, 6).join(', ')}` : ''}`)
     .join('\n')
+  const accountLines = accounts.map((a) => `- ${a.id} — ${a.name} (${a.type})`).join('\n')
   return `You parse informal Indian-English expense notes into transactions. Amounts are INR.
 Today is ${todayISO()} (IST). Rules:
 - "N item of P" or "N item @ P" means quantity N at unit price P; totalAmount = N*P.
@@ -25,13 +34,22 @@ Today is ${todayISO()} (IST). Rules:
 - Multiple items may be joined by "and", ",", or newlines — return one object per item.
 - Default type is "expense"; words like salary, received, refund, credited mean "income".
 - Resolve relative dates (yesterday, last friday) to YYYY-MM-DD; omit the date field entirely if unstated.
-- Pick category from this list (use the id):
+- Prefer a category id from this list:
 ${categoryLines}
+- If nothing in the list genuinely fits, invent a new category: set category to a short new
+  kebab-case id, and also set categoryName (Title Case display name) and categoryEmoji
+  (one fitting emoji). Do this sparingly — most everyday items fit an existing category.
+${
+  accounts.length > 0
+    ? `- If the note names or clearly implies one of the user's accounts, set account to its id; otherwise OMIT the account field:
+${accountLines}`
+    : ''
+}
 - description: short lowercase noun phrase ("tea", "auto to office").
 Return ONLY the JSON array.`
 }
 
-function buildResponseSchema(categories: Category[]) {
+function buildResponseSchema(accounts: Account[]) {
   return {
     type: 'ARRAY',
     items: {
@@ -42,7 +60,10 @@ function buildResponseSchema(categories: Category[]) {
         quantity: { type: 'NUMBER' },
         unitAmount: { type: 'NUMBER' },
         totalAmount: { type: 'NUMBER' },
-        category: { type: 'STRING', enum: categories.map((c) => c.id) },
+        category: { type: 'STRING' },
+        categoryName: { type: 'STRING' },
+        categoryEmoji: { type: 'STRING' },
+        ...(accounts.length > 0 ? { account: { type: 'STRING', enum: accounts.map((a) => a.id) } } : {}),
         date: { type: 'STRING' },
       },
       required: ['type', 'description', 'totalAmount', 'category'],
@@ -51,7 +72,11 @@ function buildResponseSchema(categories: Category[]) {
 }
 
 /** Parse a quick-entry note into transactions via Gemini structured output. */
-export async function parseWithGemini(input: string, categories: Category[]): Promise<ParsedEntry[]> {
+export async function parseWithGemini(
+  input: string,
+  categories: Category[],
+  accounts: Account[] = [],
+): Promise<ParsedEntry[]> {
   const key = getConfig('geminiKey')
   if (!key) throw new NoGeminiKeyError('No Gemini API key configured')
 
@@ -61,12 +86,12 @@ export async function parseWithGemini(input: string, categories: Category[]): Pr
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify({
-        system_instruction: { parts: [{ text: buildSystemPrompt(categories) }] },
+        system_instruction: { parts: [{ text: buildSystemPrompt(categories, accounts) }] },
         contents: [{ parts: [{ text: input }] }],
         generationConfig: {
           temperature: 0,
           response_mime_type: 'application/json',
-          response_schema: buildResponseSchema(categories),
+          response_schema: buildResponseSchema(accounts),
         },
       }),
     })
@@ -93,7 +118,8 @@ export async function parseWithGemini(input: string, categories: Category[]): Pr
   }
   if (!Array.isArray(parsed)) throw new GeminiError('Gemini returned unexpected shape')
 
-  const validIds = new Set(categories.map((c) => c.id))
+  const validCategoryIds = new Set(categories.map((c) => c.id))
+  const validAccountIds = new Set(accounts.map((a) => a.id))
   return parsed
     .filter(
       (e): e is ParsedEntry =>
@@ -103,11 +129,26 @@ export async function parseWithGemini(input: string, categories: Category[]): Pr
         (e as ParsedEntry).totalAmount > 0 &&
         typeof (e as ParsedEntry).description === 'string',
     )
-    .map((e) => ({
-      ...e,
-      type: e.type === 'income' ? 'income' : 'expense',
-      category: validIds.has(e.category) ? e.category : 'other',
-    }))
+    .map((e) => {
+      const existing = validCategoryIds.has(e.category)
+      const newId = existing ? e.category : toKebabId(e.category || '')
+      return {
+        ...e,
+        type: e.type === 'income' ? 'income' : 'expense',
+        category: existing ? e.category : newId || 'other',
+        // Only carry new-category metadata when the id is genuinely new
+        categoryName: existing || !newId ? undefined : (e.categoryName ?? titleCase(newId)),
+        categoryEmoji: existing || !newId ? undefined : (e.categoryEmoji ?? '🏷️'),
+        account: e.account && validAccountIds.has(e.account) ? e.account : undefined,
+      } satisfies ParsedEntry
+    })
+}
+
+function titleCase(kebab: string): string {
+  return kebab
+    .split('-')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
 }
 
 const CHUNK_SIZE = 50

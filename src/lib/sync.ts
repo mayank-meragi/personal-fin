@@ -9,7 +9,7 @@ import {
 } from './cache'
 import { mergeFile } from './merge'
 import { defaultCategories } from '../defaults/categories'
-import type { BudgetsFile, SettingsFile } from './types'
+import type { AccountsFile, BudgetsFile, SettingsFile } from './types'
 
 export type SyncStatus = 'idle' | 'pending' | 'syncing' | 'offline' | 'auth-error' | 'error'
 
@@ -165,11 +165,13 @@ async function resolveConflict(path: string): Promise<void> {
 
 const defaultBudgets: BudgetsFile = { monthlyLimits: {}, overrides: {} }
 const defaultSettings: SettingsFile = { schemaVersion: 1, currency: 'INR', startOfMonth: 1 }
+const defaultAccounts: AccountsFile = { accounts: [] }
 
 export const SEED_FILES: { path: string; content: unknown }[] = [
   { path: 'categories.json', content: defaultCategories },
   { path: 'budgets.json', content: defaultBudgets },
   { path: 'settings.json', content: defaultSettings },
+  { path: 'accounts.json', content: defaultAccounts },
 ]
 
 /** First-run bootstrap: create seed files on the data branch if absent. */

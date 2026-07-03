@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import CsvMapper from '../components/CsvMapper'
-import { fileQueryKey, useCategories } from '../hooks/useData'
+import { fileQueryKey, useAccounts, useCategories } from '../hooks/useData'
 import { makeTransaction, useTransactionMutations } from '../hooks/useTransactions'
 import { extractRows, guessMapping, parseBankCsv, computeImportHash, type ColumnMapping, type ImportedRow, type RawCsv } from '../lib/csv'
 import { categorizeWithGemini, hasGeminiKey, GeminiError } from '../lib/gemini'
@@ -19,10 +19,12 @@ interface ReviewRow extends ImportedRow {
 
 export default function ImportPage() {
   const { categories } = useCategories()
+  const { accounts } = useAccounts()
   const { saveAll } = useTransactionMutations()
   const queryClient = useQueryClient()
 
   const [raw, setRaw] = useState<RawCsv | null>(null)
+  const [account, setAccount] = useState('')
   const [mapping, setMapping] = useState<ColumnMapping | null>(null)
   const [rows, setRows] = useState<ReviewRow[] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -119,6 +121,7 @@ export default function ImportPage() {
         amount: r.amount,
         date: r.date,
         category: r.category,
+        account: account || undefined,
         note: r.description,
         source: 'csv',
         importHash: r.importHash,
@@ -156,10 +159,29 @@ export default function ImportPage() {
       {raw && mapping && !rows && (
         <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-4">
           <h2 className="text-sm font-semibold">Map columns ({raw.rows.length} rows found)</h2>
+          {accounts.length > 0 && (
+            <label className="block text-sm">
+              <span className="font-medium">Import into account</span>
+              <select
+                className={`mt-1 w-full max-w-xs rounded-md border px-2 py-1.5 text-sm ${
+                  account ? 'border-slate-300' : 'border-red-400'
+                }`}
+                value={account}
+                onChange={(e) => setAccount(e.target.value)}
+              >
+                <option value="">Select the statement's account…</option>
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <CsvMapper raw={raw} mapping={mapping} onChange={setMapping} />
           <button
             type="button"
-            disabled={busy !== null}
+            disabled={busy !== null || (accounts.length > 0 && !account)}
             onClick={() => void buildReview()}
             className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           >

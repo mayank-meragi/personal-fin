@@ -7,10 +7,12 @@ import BudgetsPage from './pages/BudgetsPage'
 import ImportPage from './pages/ImportPage'
 import SettingsPage from './pages/SettingsPage'
 import Onboarding from './components/Onboarding'
+import AccountSetup from './components/AccountSetup'
 import SyncStatus from './components/SyncStatus'
 import { isConfigured } from './lib/cache'
 import { initSync, flush } from './lib/sync'
 import { useSyncState } from './hooks/useSyncState'
+import { useAccounts } from './hooks/useData'
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: '📊', end: true },
@@ -24,6 +26,7 @@ export default function App() {
   const [configured, setConfigured] = useState(isConfigured)
   const sync = useSyncState()
   const queryClient = useQueryClient()
+  const { accounts, isReady: accountsReady } = useAccounts()
 
   useEffect(() => {
     initSync()
@@ -40,6 +43,14 @@ export default function App() {
             void flush()
           }}
         />
+      </div>
+    )
+  }
+
+  if (accountsReady && accounts.length === 0) {
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-900">
+        <AccountSetup />
       </div>
     )
   }

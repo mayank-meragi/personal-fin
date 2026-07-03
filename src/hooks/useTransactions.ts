@@ -1,7 +1,8 @@
-import { useQueries, useQueryClient } from '@tanstack/react-query'
-import { getCachedFile } from '../lib/cache'
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import { getCachedFile, isConfigured } from '../lib/cache'
+import { listDir } from '../lib/github'
 import { loadFile, updateFile } from '../lib/sync'
-import { monthKey, transactionsPath } from '../lib/dates'
+import { currentMonthKey, monthKey, transactionsPath } from '../lib/dates'
 import type { Transaction } from '../lib/types'
 import { fileQueryKey, useFileQuery } from './useData'
 
@@ -9,6 +10,33 @@ const empty: Transaction[] = []
 
 export function useTransactions(month: string) {
   return useFileQuery<Transaction[]>(transactionsPath(month), empty)
+}
+
+/**
+ * Every transaction across all months, discovered by listing the transactions
+ * directory. Used for account balances, recent activity, and account
+ * inference. Fine at personal scale — a year is only ~12 small files.
+ */
+export function useAllTransactions(): { transactions: Transaction[]; isReady: boolean } {
+  const monthsQuery = useQuery({
+    queryKey: ['transaction-months'],
+    queryFn: async () => {
+      const files = await listDir('transactions')
+      return files
+        .map((f) => f.name.replace(/\.json$/, ''))
+        .filter((name) => /^\d{4}-\d{2}$/.test(name))
+    },
+    enabled: isConfigured(),
+    // The directory listing rarely changes; the month files themselves revalidate
+    staleTime: 5 * 60_000,
+    placeholderData: [currentMonthKey()],
+  })
+  const months = monthsQuery.data ?? []
+  const byMonth = useMonthsTransactions(months)
+  return {
+    transactions: months.flatMap((m) => byMonth[m] ?? []),
+    isReady: monthsQuery.isFetchedAfterMount,
+  }
 }
 
 /** Transactions for several months at once, keyed by month. */
@@ -19,6 +47,7 @@ export function useMonthsTransactions(months: string[]): Record<string, Transact
       return {
         queryKey: fileQueryKey(path),
         queryFn: () => loadFile<Transaction[]>(path, empty),
+        enabled: isConfigured(),
         initialData: () => getCachedFile<Transaction[]>(path)?.content ?? empty,
         initialDataUpdatedAt: 0,
       }
@@ -78,7 +107,7 @@ export function useTransactionMutations() {
 
 export function makeTransaction(
   fields: Pick<Transaction, 'type' | 'amount' | 'date' | 'category' | 'note' | 'source'> &
-    Partial<Pick<Transaction, 'quantity' | 'importHash'>>,
+    Partial<Pick<Transaction, 'account' | 'quantity' | 'importHash'>>,
 ): Transaction {
   const now = new Date().toISOString()
   return {

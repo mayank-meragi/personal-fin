@@ -1,19 +1,30 @@
 import { useState } from 'react'
-import { useCategories } from '../hooks/useData'
-import { makeTransaction, useTransactionMutations } from '../hooks/useTransactions'
+import { useAccounts, useCategories } from '../hooks/useData'
+import { makeTransaction, useAllTransactions, useTransactionMutations } from '../hooks/useTransactions'
 import { hasGeminiKey, parseWithGemini, GeminiError, NoGeminiKeyError } from '../lib/gemini'
 import { quickParse } from '../lib/quickParse'
+import { inferAccount } from '../lib/accounts'
 import { todayISO } from '../lib/dates'
 import { formatINRExact } from '../lib/money'
 import type { ParsedEntry } from '../lib/types'
 
 export default function QuickEntry() {
-  const { categories } = useCategories()
+  const { categories, addCategory } = useCategories()
+  const { accounts } = useAccounts()
+  const { transactions: history } = useAllTransactions()
   const { saveAll } = useTransactionMutations()
   const [text, setText] = useState('')
   const [entries, setEntries] = useState<ParsedEntry[]>([])
   const [parsing, setParsing] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+
+  function withInferredAccounts(parsed: ParsedEntry[]): ParsedEntry[] {
+    return parsed.map((e) => {
+      if (e.account) return e
+      if (accounts.length === 1) return { ...e, account: accounts[0].id }
+      return { ...e, account: inferAccount(e.description, history) }
+    })
+  }
 
   async function parse() {
     const input = text.trim()
@@ -21,13 +32,15 @@ export default function QuickEntry() {
     setParsing(true)
     setNotice(null)
     try {
-      const result = await parseWithGemini(input, categories)
+      const result = withInferredAccounts(await parseWithGemini(input, categories, accounts))
       if (result.length === 0) {
         setNotice('Could not find any transactions in that — try "tea 10" or "2 tea of 5".')
+      } else if (result.some((e) => !e.account)) {
+        setNotice('Could not tell which account some items belong to — pick one below.')
       }
       setEntries(result)
     } catch (e) {
-      const fallback = quickParse(input, categories)
+      const fallback = withInferredAccounts(quickParse(input, categories))
       setEntries(fallback)
       if (e instanceof NoGeminiKeyError) {
         if (fallback.length === 0) {
@@ -51,13 +64,29 @@ export default function QuickEntry() {
     setEntries((prev) => prev.filter((_, i) => i !== index))
   }
 
+  const knownCategoryIds = new Set(categories.map((c) => c.id))
+  const missingAccount = accounts.length > 0 && entries.some((e) => !e.account)
+
   function saveEntries() {
+    // Create any categories the AI invented before saving transactions that use them
+    for (const e of entries) {
+      if (!knownCategoryIds.has(e.category)) {
+        addCategory({
+          id: e.category,
+          name: e.categoryName ?? e.category,
+          emoji: e.categoryEmoji ?? '🏷️',
+          type: e.type,
+          hints: [e.description],
+        })
+      }
+    }
     const txs = entries.map((e) =>
       makeTransaction({
         type: e.type,
         amount: e.totalAmount,
         date: e.date && /^\d{4}-\d{2}-\d{2}$/.test(e.date) ? e.date : todayISO(),
         category: e.category,
+        account: e.account,
         note: e.description,
         quantity: e.quantity,
         source: 'ai',
@@ -73,7 +102,7 @@ export default function QuickEntry() {
     <div className="rounded-lg border border-slate-200 bg-white p-4">
       <div className="flex gap-2">
         <input
-          className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
+          className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
           placeholder={
             hasGeminiKey()
               ? 'Quick add: "2 tea of 5", "coffee 30 and auto 60", "salary 90000 yesterday"…'
@@ -127,6 +156,11 @@ export default function QuickEntry() {
                 value={entry.category}
                 onChange={(e) => updateEntry(i, { category: e.target.value })}
               >
+                {!knownCategoryIds.has(entry.category) && (
+                  <option value={entry.category}>
+                    {entry.categoryEmoji ?? '🏷️'} {entry.categoryName ?? entry.category} (new)
+                  </option>
+                )}
                 {categories
                   .filter((c) => c.type === entry.type)
                   .map((c) => (
@@ -135,6 +169,22 @@ export default function QuickEntry() {
                     </option>
                   ))}
               </select>
+              {accounts.length > 0 && (
+                <select
+                  className={`min-w-0 max-w-40 rounded border bg-white px-2 py-1 text-sm ${
+                    entry.account ? 'border-slate-300' : 'border-red-400 text-red-600'
+                  }`}
+                  value={entry.account ?? ''}
+                  onChange={(e) => updateEntry(i, { account: e.target.value || undefined })}
+                >
+                  <option value="">Account…</option>
+                  {accounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+              )}
               <input
                 className="rounded border border-slate-300 bg-white px-2 py-1 text-sm"
                 type="date"
@@ -155,7 +205,8 @@ export default function QuickEntry() {
               </button>
             </div>
           ))}
-          <div className="flex justify-end gap-2">
+          <div className="flex items-center justify-end gap-2">
+            {missingAccount && <span className="text-xs text-red-600">Pick an account for the highlighted items</span>}
             <button
               type="button"
               onClick={() => setEntries([])}
@@ -166,7 +217,7 @@ export default function QuickEntry() {
             <button
               type="button"
               onClick={saveEntries}
-              disabled={entries.some((e) => !Number.isFinite(e.totalAmount) || e.totalAmount <= 0)}
+              disabled={missingAccount || entries.some((e) => !Number.isFinite(e.totalAmount) || e.totalAmount <= 0)}
               className="rounded-md bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50"
             >
               Save all ({entries.length})
