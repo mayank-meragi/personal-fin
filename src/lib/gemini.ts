@@ -5,7 +5,9 @@ import type { Category, ParsedEntry } from './types'
 export class NoGeminiKeyError extends Error {}
 export class GeminiError extends Error {}
 
-const MODEL = 'gemini-2.0-flash'
+// Stable alias — always points at the current flash model, so retired
+// versions (like gemini-2.0-flash) don't break the app
+const MODEL = 'gemini-flash-latest'
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
 
 export function hasGeminiKey(): boolean {
