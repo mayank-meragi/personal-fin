@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import CategorySpendChart from '../components/CategorySpendChart'
 import MonthPicker from '../components/MonthPicker'
+import QuickEntry from '../components/QuickEntry'
 import SummaryCards from '../components/SummaryCards'
 import TrendChart from '../components/TrendChart'
 import { effectiveLimit, useBudgets, useCategories } from '../hooks/useData'
@@ -38,6 +39,8 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-semibold">Dashboard</h1>
         <MonthPicker month={month} onChange={setMonth} />
       </div>
+
+      <QuickEntry />
 
       <SummaryCards current={totals(current)} previousExpense={totals(previous).expense} />
 
