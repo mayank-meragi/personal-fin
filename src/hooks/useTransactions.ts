@@ -1,5 +1,6 @@
-import { useQueryClient } from '@tanstack/react-query'
-import { updateFile } from '../lib/sync'
+import { useQueries, useQueryClient } from '@tanstack/react-query'
+import { getCachedFile } from '../lib/cache'
+import { loadFile, updateFile } from '../lib/sync'
 import { monthKey, transactionsPath } from '../lib/dates'
 import type { Transaction } from '../lib/types'
 import { fileQueryKey, useFileQuery } from './useData'
@@ -8,6 +9,26 @@ const empty: Transaction[] = []
 
 export function useTransactions(month: string) {
   return useFileQuery<Transaction[]>(transactionsPath(month), empty)
+}
+
+/** Transactions for several months at once, keyed by month. */
+export function useMonthsTransactions(months: string[]): Record<string, Transaction[]> {
+  const results = useQueries({
+    queries: months.map((month) => {
+      const path = transactionsPath(month)
+      return {
+        queryKey: fileQueryKey(path),
+        queryFn: () => loadFile<Transaction[]>(path, empty),
+        initialData: () => getCachedFile<Transaction[]>(path)?.content ?? empty,
+        initialDataUpdatedAt: 0,
+      }
+    }),
+  })
+  const byMonth: Record<string, Transaction[]> = {}
+  months.forEach((month, i) => {
+    byMonth[month] = results[i].data ?? empty
+  })
+  return byMonth
 }
 
 function sortByDate(txs: Transaction[]): Transaction[] {

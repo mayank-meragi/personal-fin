@@ -20,3 +20,15 @@ export function formatINR(amount: number): string {
 export function formatINRExact(amount: number): string {
   return Number.isInteger(amount) ? inrWhole.format(amount) : inrExact.format(amount)
 }
+
+const inrCompact = new Intl.NumberFormat('en-IN', {
+  style: 'currency',
+  currency: 'INR',
+  notation: 'compact',
+  maximumFractionDigits: 1,
+})
+
+/** ₹1.5L — compact figures for axis ticks and bar labels */
+export function formatINRCompact(amount: number): string {
+  return inrCompact.format(amount)
+}
