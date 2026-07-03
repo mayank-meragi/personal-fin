@@ -10,7 +10,7 @@ interface Props {
 
 export default function Onboarding({ expired, onDone }: Props) {
   const [repo, setRepo] = useState(getConfig('dataRepo') ?? '')
-  const [branch, setBranch] = useState(getConfig('dataBranch') ?? 'data')
+  const [branch, setBranch] = useState(getConfig('dataBranch') ?? 'main')
   const [token, setToken] = useState('')
   const [geminiKey, setGeminiKey] = useState(getConfig('geminiKey') ?? '')
   const [checking, setChecking] = useState(false)
@@ -75,7 +75,7 @@ export default function Onboarding({ expired, onDone }: Props) {
           <span className="font-medium">Data repo (owner/name)</span>
           <input
             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
-            placeholder="you/personal-fin"
+            placeholder="you/finance-data"
             value={repo}
             onChange={(e) => setRepo(e.target.value)}
           />

@@ -27,7 +27,7 @@ export function setConfig(key: ConfigKey, value: string | null): void {
 }
 
 export function getDataBranch(): string {
-  return getConfig('dataBranch') ?? 'data'
+  return getConfig('dataBranch') ?? 'main'
 }
 
 export function isConfigured(): boolean {
