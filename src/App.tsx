@@ -62,7 +62,9 @@ export default function App() {
       <div className="min-h-screen bg-background text-foreground">
         <header className="sticky top-0 z-20 bg-background/85 backdrop-blur">
           <div className="mx-auto flex h-14 max-w-5xl items-center gap-6 px-4">
-            <span className="text-base font-bold tracking-tight">₹ Tracker</span>
+            <span className="font-display text-base font-bold tracking-tight text-[var(--ink-900)]">
+              ₹ Tracker<span className="text-[var(--brand)]">.</span>
+            </span>
             <nav className="hidden gap-1 md:flex">
               {navItems.map((item) => (
                 <NavLink
@@ -73,7 +75,7 @@ export default function App() {
                     cn(
                       'inline-flex h-9 items-center rounded-full px-4 text-sm font-semibold transition-colors',
                       isActive
-                        ? 'bg-card text-foreground shadow-sm ring-1 ring-foreground/[0.045]'
+                        ? 'bg-[var(--ink-900)] text-white shadow-sm'
                         : 'text-muted-foreground hover:text-foreground',
                     )
                   }
@@ -105,7 +107,7 @@ export default function App() {
                 className={({ isActive }) =>
                   cn(
                     'flex size-11 items-center justify-center rounded-full transition-colors',
-                    isActive ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
+                    isActive ? 'bg-[var(--ink-900)] text-white' : 'text-muted-foreground hover:text-foreground',
                   )
                 }
               >

@@ -41,16 +41,18 @@ export default function UpcomingBills({ bills }: Props) {
         {bills.map((bill) => (
           <div key={bill.item.key} className="flex items-center gap-3 px-4 py-2.5">
             <span
-              className={cn(
-                'flex size-9 shrink-0 items-center justify-center rounded-full',
-                bill.overdue ? 'bg-red-50 text-red-600' : 'bg-muted text-muted-foreground',
-              )}
+              className="flex size-9 shrink-0 items-center justify-center rounded-[var(--radius-md)]"
+              style={
+                bill.overdue
+                  ? { background: 'var(--negative-100)', color: 'var(--negative-600)' }
+                  : { background: 'var(--ink-50)', color: 'var(--text-muted)' }
+              }
             >
               <CalendarClock className="size-4" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium capitalize">{bill.item.name}</p>
-              <p className={cn('text-xs', bill.overdue ? 'text-red-600' : 'text-muted-foreground')}>
+              <p className="truncate text-sm font-semibold capitalize text-[var(--text-strong)]">{bill.item.name}</p>
+              <p className={cn('text-xs', bill.overdue ? 'font-medium' : 'text-muted-foreground')} style={bill.overdue ? { color: 'var(--negative-600)' } : undefined}>
                 {bill.overdue ? 'expected by ' : 'expected '}
                 {new Date(bill.dueDate + 'T00:00:00').toLocaleDateString('en-IN', {
                   day: 'numeric',

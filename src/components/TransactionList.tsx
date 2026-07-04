@@ -1,10 +1,9 @@
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { cn } from '@/lib/utils'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Amount } from './Amount'
+import { ArrowLeftRight, Pencil, Trash2 } from 'lucide-react'
 import { useAccounts, useCategories } from '../hooks/useData'
-import { categoryAvatarClass } from '../lib/categoryColor'
-import { formatINRExact } from '../lib/money'
+import { categoryColor, categoryIcon, TRANSFER_COLOR } from '../lib/categoryIcon'
 import type { Transaction } from '../lib/types'
 
 interface Props {
@@ -32,19 +31,19 @@ export default function TransactionList({ transactions, onEdit, onDelete }: Prop
         const cat = catById.get(tx.category)
         const accName = tx.account ? accById.get(tx.account)?.name : undefined
         const toAccName = tx.toAccount ? accById.get(tx.toAccount)?.name : undefined
+        const color = isTransfer ? TRANSFER_COLOR : categoryColor(tx.category)
+        const Icon = isTransfer ? ArrowLeftRight : categoryIcon(cat)
         return (
           <div key={tx.id} className="group flex items-center gap-3 px-4 py-2.5">
             <span
-              className={cn(
-                'flex size-9 shrink-0 items-center justify-center rounded-full text-base',
-                isTransfer ? 'bg-sky-100 text-sky-700' : categoryAvatarClass(tx.category),
-              )}
+              className="flex size-10 shrink-0 items-center justify-center rounded-[var(--radius-md)]"
+              style={{ background: `color-mix(in oklch, ${color} 16%, white)`, color }}
               title={isTransfer ? 'Transfer' : cat?.name}
             >
-              {isTransfer ? '🔁' : (cat?.emoji ?? '📦')}
+              <Icon className="size-[18px]" strokeWidth={2} aria-hidden />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">
+              <p className="truncate text-sm font-semibold text-[var(--text-strong)]">
                 {tx.note || (isTransfer ? 'Transfer' : cat?.name || tx.category)}
                 {tx.quantity && tx.quantity > 1 ? ` ×${tx.quantity}` : ''}
               </p>
@@ -60,15 +59,12 @@ export default function TransactionList({ transactions, onEdit, onDelete }: Prop
                 {tx.source !== 'manual' ? ` · ${tx.source}` : ''}
               </p>
             </div>
-            <span
-              className={cn(
-                'text-sm font-semibold tabular-nums',
-                tx.type === 'income' ? 'text-emerald-600' : isTransfer ? 'text-muted-foreground' : 'text-foreground',
-              )}
-            >
-              {tx.type === 'income' ? '+' : isTransfer ? '' : '−'}
-              {formatINRExact(tx.amount)}
-            </span>
+            <Amount
+              value={isTransfer ? tx.amount : tx.type === 'income' ? tx.amount : -tx.amount}
+              signed={!isTransfer}
+              size="sm"
+              style={isTransfer ? { color: 'var(--text-muted)' } : undefined}
+            />
             {(onEdit || onDelete) && (
               <div className="flex gap-0.5">
                 {onEdit && (

@@ -1,19 +1,20 @@
 /**
- * Chart colors from the validated dataviz reference palette (light mode).
- * Categorical slots are assigned in fixed order and never cycled.
+ * Chart colors, adopted from the Perfin Design System tokens.
+ * Money semantics are load-bearing: income = money-in (green), expense =
+ * money-out (red) — the same two colors used everywhere money appears.
  */
 export const palette = {
-  series1: '#2a78d6', // blue — first categorical slot; also the sequential hue
-  series2: '#1baf7a', // aqua — second categorical slot
-  seqTrack: '#cde2fb', // blue-100 — meter track (lighter step of the same ramp)
-  seqDeep: '#1c5cab', // blue-550
-  critical: '#d03b3b', // status: overspent — reserved, never a series color
-  warning: '#fab219', // status: near limit
-  good: '#0ca30c',
-  ink: '#0b0b0b',
-  inkSecondary: '#52514e',
-  muted: '#898781',
-  gridline: '#e1e0d9',
-  baseline: '#c3c2b7',
+  series1: 'var(--money-out)', // expense
+  series2: 'var(--money-in)', // income
+  seqTrack: 'var(--emerald-100)',
+  seqDeep: 'var(--emerald-700)',
+  critical: 'var(--negative-500)',
+  warning: 'var(--warning-500)',
+  good: 'var(--positive-500)',
+  ink: 'var(--ink-900)',
+  inkSecondary: 'var(--text-muted)',
+  muted: 'var(--text-subtle)',
+  gridline: 'var(--border-subtle)',
+  baseline: 'var(--border-default)',
   surface: '#ffffff',
 } as const

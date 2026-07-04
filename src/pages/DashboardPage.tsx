@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import CategorySpendChart from '../components/CategorySpendChart'
+import CategoryBreakdownList from '../components/CategoryBreakdownList'
 import MonthPicker from '../components/MonthPicker'
 import NetWorthHero from '../components/NetWorthHero'
 import QuickEntry from '../components/QuickEntry'
@@ -12,10 +12,40 @@ import UpcomingBills from '../components/UpcomingBills'
 import { effectiveLimit, useAccounts, useBudgets, useCategories } from '../hooks/useData'
 import { useAllTransactions, useMonthsTransactions } from '../hooks/useTransactions'
 import { accountBalances } from '../lib/accounts'
+import { getConfig } from '../lib/cache'
 import { detectRecurring, upcomingInMonth } from '../lib/recurring'
 import { currentMonthKey, lastNMonthKeys, monthKey, monthLabel, todayISO } from '../lib/dates'
 import { formatINR } from '../lib/money'
 import { spentByCategory, totals } from '../lib/stats'
+
+/** First name from the data repo's GitHub owner, e.g. "mayank-meragi" → "Mayank" */
+function ownerFirstName(): string | null {
+  const owner = getConfig('dataRepo')?.split('/')[0]
+  const first = owner?.split(/[-_.]/)[0]
+  return first ? first.charAt(0).toUpperCase() + first.slice(1) : null
+}
+
+function timeGreeting(): string {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 17) return 'Good afternoon'
+  return 'Good evening'
+}
+
+function GreetingHeader() {
+  const name = ownerFirstName()
+  return (
+    <div className="flex items-center justify-between">
+      <p className="font-display text-xl font-semibold text-[var(--text-strong)]">
+        {timeGreeting()}
+        {name ? `, ${name}` : ''}
+      </p>
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--emerald-100)] font-display text-sm font-bold text-[var(--emerald-700)]">
+        {(name?.[0] ?? '₹').toUpperCase()}
+      </span>
+    </div>
+  )
+}
 
 export default function DashboardPage() {
   const [month, setMonth] = useState(currentMonthKey())
@@ -73,6 +103,8 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-4">
+      <GreetingHeader />
+
       <NetWorthHero
         totalBalance={totalBalance}
         series={heroSeries}
@@ -93,10 +125,12 @@ export default function DashboardPage() {
               to="/budgets"
               className={cn(
                 'block rounded-2xl px-4 py-2.5 text-sm',
-                w.ratio > 1 ? 'bg-red-50 text-red-800 ring-1 ring-red-100' : 'bg-amber-50 text-amber-800 ring-1 ring-amber-100',
+                w.ratio > 1
+                  ? 'bg-[var(--negative-100)] text-[var(--negative-600)]'
+                  : 'bg-[var(--warning-100)] text-[var(--warning-600)]',
               )}
             >
-              ⚠ {w.category.emoji} {w.category.name}: {formatINR(w.spent)} of {formatINR(w.limit)}{' '}
+              {w.category.name}: {formatINR(w.spent)} of {formatINR(w.limit)}{' '}
               {w.ratio > 1 ? `— over by ${formatINR(w.spent - w.limit)}` : '— nearing limit'}
             </Link>
           ))}
@@ -110,18 +144,11 @@ export default function DashboardPage() {
         <MonthPicker month={month} onChange={setMonth} />
       </div>
 
-      <Card className="gap-3">
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold">Spend by category</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <CategorySpendChart transactions={current} />
-        </CardContent>
-      </Card>
+      <CategoryBreakdownList transactions={current} categories={categories} periodLabel={monthLabel(month)} />
 
       <Card className="gap-3">
         <CardHeader>
-          <CardTitle className="text-sm font-semibold">Income vs expense</CardTitle>
+          <CardTitle className="font-display text-base font-semibold">Income vs expense</CardTitle>
         </CardHeader>
         <CardContent>
           <TrendChart byMonth={byMonth} months={months} />
@@ -133,7 +160,7 @@ export default function DashboardPage() {
           <h2 className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
             Recent transactions
           </h2>
-          <Link to="/transactions" className="text-xs font-medium text-primary underline-offset-4 hover:underline">
+          <Link to="/transactions" className="text-xs font-medium text-[var(--brand)] underline-offset-4 hover:underline">
             view all
           </Link>
         </div>

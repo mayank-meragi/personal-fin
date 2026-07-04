@@ -11,8 +11,6 @@ import {
   X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { fileQueryKey, useAccounts, useCategories, useFileQuery } from '../hooks/useData'
 import { makeTransaction, useAllTransactions, useTransactionMutations } from '../hooks/useTransactions'
@@ -20,7 +18,7 @@ import { hasGeminiKey, parseWithGemini, GeminiError, NoGeminiKeyError } from '..
 import { quickParse } from '../lib/quickParse'
 import { accountBalances, accountTypeEmoji, inferAccount } from '../lib/accounts'
 import { AI_MEMORY_PATH, emptyAiMemory, maybeRefreshAiMemory, type AiMemoryFile } from '../lib/aiMemory'
-import { categoryAvatarClass } from '../lib/categoryColor'
+import { categoryColor, categoryIcon, TRANSFER_COLOR } from '../lib/categoryIcon'
 import { todayISO } from '../lib/dates'
 import { formatINRExact } from '../lib/money'
 import type { ParsedEntry, TransactionType } from '../lib/types'
@@ -235,47 +233,48 @@ export default function QuickEntry() {
   }
 
   return (
-    <Card className="gap-3 p-4">
-      <h2 className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Quick Add</h2>
-      <div className="space-y-2">
-        <Input
-          className="border-transparent bg-transparent px-1 text-base shadow-none focus-visible:border-transparent focus-visible:ring-0"
-          placeholder={
-            hasGeminiKey()
-              ? '"2 tea of 5", "paid credit card 3200", "23k left in hdfc"…'
-              : '"tea 10", "coffee 30 and auto 60"…'
-          }
+    <div className="space-y-2">
+      <div
+        className="flex items-center gap-2 rounded-[var(--radius-pill)] bg-[var(--surface-card)] py-2 pr-2 pl-2 shadow-[var(--shadow-sm)] ring-1 ring-[var(--border-subtle)]"
+      >
+        <button
+          type="button"
+          onClick={() => void parse()}
+          disabled={parsing || (!text.trim() && !image)}
+          aria-label={parsing ? 'Parsing…' : 'Parse with AI'}
+          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--ink-900)] text-white transition-transform active:scale-90 disabled:opacity-50"
+        >
+          <Sparkles className="size-4" />
+        </button>
+        <input
+          className="min-w-0 flex-1 bg-transparent text-[15px] text-[var(--text-strong)] outline-none placeholder:text-[var(--text-subtle)]"
+          placeholder={hasGeminiKey() ? 'Add anything — "auto 85", "23k left in hdfc"…' : 'Add anything — "tea 10"…'}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') void parse()
           }}
         />
-        <div className="flex justify-end gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label="Attach a payment screenshot"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <ImagePlus />
-          </Button>
-          <Button onClick={() => void parse()} disabled={parsing || (!text.trim() && !image)}>
-            <Sparkles data-icon="inline-start" />
-            {parsing ? 'Parsing…' : 'Add'}
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0]
-              if (f) attachImage(f)
-              e.target.value = ''
-            }}
-          />
-        </div>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="shrink-0 text-muted-foreground"
+          aria-label="Attach a payment screenshot"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <ImagePlus />
+        </Button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            if (f) attachImage(f)
+            e.target.value = ''
+          }}
+        />
       </div>
       {image && (
         <div className="flex items-center gap-2">
@@ -291,9 +290,8 @@ export default function QuickEntry() {
         <div className="space-y-2">
           {entries.map((entry, i) => {
             const category = categories.find((c) => c.id === entry.category)
-            const avatarEmoji =
-              entry.type === 'transfer' ? '🔁' : (category?.emoji ?? entry.categoryEmoji ?? '🏷️')
-            const avatarClass = entry.type === 'transfer' ? 'bg-sky-100 text-sky-700' : categoryAvatarClass(entry.category)
+            const tileColor = entry.type === 'transfer' ? TRANSFER_COLOR : categoryColor(entry.category)
+            const TileIcon = entry.type === 'transfer' ? ArrowLeftRight : categoryIcon(category)
             const accountMissing = !entry.account
             const toAccountMissing = entry.type === 'transfer' && (!entry.toAccount || entry.toAccount === entry.account)
             const TypeIcon = typeChip[entry.type].icon
@@ -302,13 +300,11 @@ export default function QuickEntry() {
               <div key={i} className="space-y-2.5 rounded-2xl bg-muted/40 p-3.5">
                 <div className="flex items-center gap-3">
                   <span
-                    className={cn(
-                      'flex size-10 shrink-0 items-center justify-center rounded-full text-lg',
-                      avatarClass,
-                    )}
+                    className="flex size-10 shrink-0 items-center justify-center rounded-[var(--radius-md)]"
+                    style={{ background: `color-mix(in oklch, ${tileColor} 16%, white)`, color: tileColor }}
                     aria-hidden
                   >
-                    {avatarEmoji}
+                    <TileIcon className="size-[18px]" strokeWidth={2} />
                   </span>
                   <div className="min-w-0 flex-1">
                     <input
@@ -461,6 +457,6 @@ export default function QuickEntry() {
           </div>
         </div>
       )}
-    </Card>
+    </div>
   )
 }

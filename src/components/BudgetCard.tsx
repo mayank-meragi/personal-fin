@@ -2,6 +2,8 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
+import { Amount } from './Amount'
+import { categoryColor, categoryIcon } from '../lib/categoryIcon'
 import { formatINR } from '../lib/money'
 import type { Category } from '../lib/types'
 
@@ -16,12 +18,19 @@ export default function BudgetCard({ category, spent, limit, onLimitChange }: Pr
   const ratio = limit && limit > 0 ? spent / limit : null
   const over = ratio !== null && ratio > 1
   const near = ratio !== null && ratio >= 0.85 && ratio <= 1
+  const color = categoryColor(category.id)
+  const Icon = categoryIcon(category)
 
   return (
     <Card className="gap-3 p-4">
-      <div className="flex items-center gap-2">
-        <span className="text-xl">{category.emoji}</span>
-        <span className="flex-1 text-sm font-medium">{category.name}</span>
+      <div className="flex items-center gap-2.5">
+        <span
+          className="flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-md)]"
+          style={{ background: `color-mix(in oklch, ${color} 16%, white)`, color }}
+        >
+          <Icon className="size-4" strokeWidth={2} />
+        </span>
+        <span className="flex-1 text-sm font-semibold text-[var(--text-strong)]">{category.name}</span>
         <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
           limit ₹
           <Input
@@ -43,18 +52,25 @@ export default function BudgetCard({ category, spent, limit, onLimitChange }: Pr
             value={Math.min(100, (spent / limit) * 100)}
             className={cn(
               over
-                ? '[&_[data-slot=progress-indicator]]:bg-red-600'
+                ? '[&_[data-slot=progress-indicator]]:bg-[var(--negative-500)]'
                 : near
-                  ? '[&_[data-slot=progress-indicator]]:bg-amber-500'
-                  : '[&_[data-slot=progress-indicator]]:bg-primary',
+                  ? '[&_[data-slot=progress-indicator]]:bg-[var(--warning-500)]'
+                  : '[&_[data-slot=progress-indicator]]:bg-[var(--brand)]',
             )}
           />
-          <p className="text-xs text-muted-foreground">
-            <span className="tabular-nums">
-              {formatINR(spent)} of {formatINR(limit)}
-            </span>
-            {over && <span className="ml-2 font-semibold text-red-600">⚠ Over by {formatINR(spent - limit)}</span>}
-            {near && <span className="ml-2 font-semibold text-amber-600">Nearing limit</span>}
+          <p className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Amount value={spent} direction="neutral" signed={false} size="sm" weight="semibold" style={{ color: 'var(--text-muted)' }} />
+            <span>of {formatINR(limit)}</span>
+            {over && (
+              <span className="font-semibold" style={{ color: 'var(--negative-600)' }}>
+                {formatINR(spent - limit)} over budget
+              </span>
+            )}
+            {near && (
+              <span className="font-semibold" style={{ color: 'var(--warning-600)' }}>
+                Nearing limit
+              </span>
+            )}
           </p>
         </div>
       ) : (

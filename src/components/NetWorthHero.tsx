@@ -1,8 +1,7 @@
+import { ChevronUp, ChevronDown } from 'lucide-react'
 import { Area, AreaChart, ResponsiveContainer, YAxis } from 'recharts'
 import { Card } from '@/components/ui/card'
-import { cn } from '@/lib/utils'
-
-const GREEN = '#16a34a'
+import { Amount } from './Amount'
 
 interface Props {
   totalBalance: number
@@ -13,49 +12,43 @@ interface Props {
   accounts: { id: string; name: string; balance: number }[]
 }
 
-/** ₹ rendered smaller than the figure, Fold-style */
-function Amount({ value, className, signed }: { value: number; className?: string; signed?: boolean }) {
-  const sign = signed ? (value >= 0 ? '+' : '−') : value < 0 ? '−' : ''
-  return (
-    <span className={cn('tabular-nums', className)}>
-      {sign}
-      <span className="mr-0.5 align-[0.08em] text-[0.7em] font-semibold">₹</span>
-      {Math.abs(value).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-    </span>
-  )
-}
-
 export default function NetWorthHero({ totalBalance, series, thisMonthNet, thisMonthSpent, accounts }: Props) {
-  const stats: { label: string; value: number; signed?: boolean; tone?: string }[] = [
-    {
-      label: 'This month',
-      value: thisMonthNet,
-      signed: true,
-      tone: thisMonthNet >= 0 ? 'text-emerald-600' : 'text-red-600',
-    },
+  const up = thisMonthNet >= 0
+
+  const stats: { label: string; value: number; tone?: string }[] = [
     { label: 'Spent', value: thisMonthSpent },
     ...accounts.map((a) => ({
       label: a.name,
       value: a.balance,
-      tone: a.balance < 0 ? 'text-red-600' : undefined,
+      tone: a.balance < 0 ? 'var(--negative-600)' : undefined,
     })),
   ]
 
   return (
     <Card className="gap-0 p-0">
-      <div className="flex items-start justify-between px-5 pt-5">
-        <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Net worth</p>
-          <Amount value={totalBalance} className="text-[2rem] font-bold leading-tight tracking-tight" />
+      <div className="px-5 pt-5">
+        <p className="perfin-eyebrow">Net worth</p>
+        {/* Whole rupees at display size — paise precision isn't the point of a headline figure */}
+        <Amount value={Math.round(totalBalance)} direction="neutral" signed={false} size="display" />
+        <div
+          className="mt-2 inline-flex items-center gap-1 rounded-[var(--radius-pill)] px-2.5 py-1 text-xs font-bold"
+          style={{
+            background: up ? 'var(--positive-100)' : 'var(--negative-100)',
+            color: up ? 'var(--positive-600)' : 'var(--negative-600)',
+          }}
+        >
+          {up ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+          <Amount value={thisMonthNet} size="sm" weight="bold" style={{ color: 'inherit' }} />
+          <span className="font-medium opacity-80">this month</span>
         </div>
       </div>
-      <div className="relative h-32">
+      <div className="relative mt-1 h-28">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={series} margin={{ top: 12, right: 0, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="networth-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={GREEN} stopOpacity={0.14} />
-                <stop offset="100%" stopColor={GREEN} stopOpacity={0} />
+                <stop offset="0%" stopColor="var(--brand)" stopOpacity={0.16} />
+                <stop offset="100%" stopColor="var(--brand)" stopOpacity={0} />
               </linearGradient>
             </defs>
             {/* Padded domain so a flat series still draws mid-card, not on the edge */}
@@ -63,7 +56,7 @@ export default function NetWorthHero({ totalBalance, series, thisMonthNet, thisM
             <Area
               type="monotone"
               dataKey="value"
-              stroke={GREEN}
+              stroke="var(--brand)"
               strokeWidth={2}
               fill="url(#networth-fill)"
               isAnimationActive={false}
@@ -74,10 +67,10 @@ export default function NetWorthHero({ totalBalance, series, thisMonthNet, thisM
           — last 6 months —
         </p>
       </div>
-      <div className="flex divide-x overflow-x-auto border-t">
+      <div className="flex divide-x overflow-x-auto border-t border-[var(--border-subtle)]">
         {stats.map((s) => (
           <div key={s.label} className="min-w-28 shrink-0 px-4 py-3">
-            <Amount value={s.value} signed={s.signed} className={cn('text-base font-bold', s.tone)} />
+            <Amount value={s.value} direction="neutral" signed={false} size="md" weight="bold" style={s.tone ? { color: s.tone } : undefined} />
             <p className="mt-0.5 truncate text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
               {s.label}
             </p>
