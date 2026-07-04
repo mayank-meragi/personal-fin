@@ -1,5 +1,11 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { Sparkles } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils'
 import CsvMapper from '../components/CsvMapper'
 import { fileQueryKey, useAccounts, useCategories } from '../hooks/useData'
 import { makeTransaction, useTransactionMutations } from '../hooks/useTransactions'
@@ -138,9 +144,9 @@ export default function ImportPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Import bank CSV</h1>
+      <h1 className="text-xl font-semibold tracking-tight">Import bank CSV</h1>
 
-      <label className="block cursor-pointer rounded-lg border-2 border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500 hover:border-slate-400">
+      <label className="block cursor-pointer rounded-xl border-2 border-dashed bg-background p-8 text-center text-sm text-muted-foreground transition-colors hover:border-ring hover:text-foreground">
         Drop or click to choose a bank statement CSV
         <input
           type="file"
@@ -154,135 +160,130 @@ export default function ImportPage() {
         />
       </label>
 
-      {notice && <p className="rounded-md bg-slate-100 px-3 py-2 text-sm text-slate-700">{notice}</p>}
+      {notice && <p className="rounded-lg border bg-muted/60 px-3 py-2 text-sm">{notice}</p>}
 
       {raw && mapping && !rows && (
-        <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold">Map columns ({raw.rows.length} rows found)</h2>
-          {accounts.length > 0 && (
-            <label className="block text-sm">
-              <span className="font-medium">Import into account</span>
-              <select
-                className={`mt-1 w-full max-w-xs rounded-md border px-2 py-1.5 text-sm ${
-                  account ? 'border-slate-300' : 'border-red-400'
-                }`}
-                value={account}
-                onChange={(e) => setAccount(e.target.value)}
-              >
-                <option value="">Select the statement's account…</option>
-                {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          <CsvMapper raw={raw} mapping={mapping} onChange={setMapping} />
-          <button
-            type="button"
-            disabled={busy !== null || (accounts.length > 0 && !account)}
-            onClick={() => void buildReview()}
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          >
-            {busy ?? 'Continue to review'}
-          </button>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Map columns ({raw.rows.length} rows found)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {accounts.length > 0 && (
+              <div className="max-w-xs space-y-1.5">
+                <Label>Import into account</Label>
+                <select
+                  className={cn(
+                    'h-8 w-full rounded-md border border-input bg-background px-2 text-sm shadow-xs',
+                    !account && 'border-red-300',
+                  )}
+                  value={account}
+                  onChange={(e) => setAccount(e.target.value)}
+                >
+                  <option value="">Select the statement's account…</option>
+                  {accounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <CsvMapper raw={raw} mapping={mapping} onChange={setMapping} />
+            <Button disabled={busy !== null || (accounts.length > 0 && !account)} onClick={() => void buildReview()}>
+              {busy ?? 'Continue to review'}
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
       {rows && (
-        <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-sm font-semibold">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">
               Review — {selectedCount} of {rows.length} selected
               {rows.some((r) => r.duplicate) &&
                 ` (${rows.filter((r) => r.duplicate).length} likely duplicates unchecked)`}
-            </h2>
-            {hasGeminiKey() && (
-              <button
-                type="button"
-                disabled={busy !== null}
-                onClick={() => void aiCategorize()}
-                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs hover:bg-slate-100 disabled:opacity-50"
-              >
-                {busy ?? '✨ Categorize uncategorized with AI'}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setRows(null)}
-              className="ml-auto rounded-md px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-100"
-            >
-              ← Back to mapping
-            </button>
-          </div>
-          <div className="max-h-96 overflow-y-auto rounded-md border border-slate-200">
-            <table className="w-full text-left text-sm">
-              <thead className="sticky top-0 bg-slate-50 text-xs text-slate-500">
-                <tr>
-                  <th className="px-2 py-1.5" />
-                  <th className="px-2 py-1.5">Date</th>
-                  <th className="px-2 py-1.5">Description</th>
-                  <th className="px-2 py-1.5">Category</th>
-                  <th className="px-2 py-1.5 text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {rows.map((row, i) => (
-                  <tr key={i} className={row.duplicate && !row.selected ? 'bg-slate-50 text-slate-400' : ''}>
-                    <td className="px-2 py-1.5">
-                      <input
-                        type="checkbox"
-                        checked={row.selected}
-                        onChange={(e) =>
-                          setRows((prev) =>
-                            prev ? prev.map((r, j) => (j === i ? { ...r, selected: e.target.checked } : r)) : prev,
-                          )
-                        }
-                      />
-                    </td>
-                    <td className="px-2 py-1.5 whitespace-nowrap">
-                      {row.date}
-                      {row.duplicate && <span className="ml-1 text-xs">(dup)</span>}
-                    </td>
-                    <td className="max-w-64 truncate px-2 py-1.5">{row.description}</td>
-                    <td className="px-2 py-1.5">
-                      <select
-                        className="rounded border border-slate-300 bg-white px-1 py-0.5 text-xs"
-                        value={row.category}
-                        onChange={(e) =>
-                          setRows((prev) =>
-                            prev ? prev.map((r, j) => (j === i ? { ...r, category: e.target.value } : r)) : prev,
-                          )
-                        }
-                      >
-                        {categories
-                          .filter((c) => c.type === row.type)
-                          .map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.emoji} {c.name}
-                            </option>
-                          ))}
-                      </select>
-                    </td>
-                    <td className={`px-2 py-1.5 text-right ${row.type === 'income' ? 'text-emerald-600' : ''}`}>
-                      {row.type === 'income' ? '+' : '−'}
-                      {formatINRExact(row.amount)}
-                    </td>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {hasGeminiKey() && (
+                <Button variant="outline" size="sm" disabled={busy !== null} onClick={() => void aiCategorize()}>
+                  <Sparkles data-icon="inline-start" />
+                  {busy ?? 'Categorize uncategorized with AI'}
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setRows(null)}>
+                ← Back to mapping
+              </Button>
+            </div>
+            <div className="max-h-96 overflow-y-auto rounded-lg border">
+              <table className="w-full text-left text-sm">
+                <thead className="sticky top-0 bg-muted/60 text-xs text-muted-foreground">
+                  <tr>
+                    <th className="px-2 py-2" />
+                    <th className="px-2 py-2 font-medium">Date</th>
+                    <th className="px-2 py-2 font-medium">Description</th>
+                    <th className="px-2 py-2 font-medium">Category</th>
+                    <th className="px-2 py-2 text-right font-medium">Amount</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <button
-            type="button"
-            disabled={selectedCount === 0 || busy !== null}
-            onClick={doImport}
-            className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          >
-            Import {selectedCount} transactions
-          </button>
-        </div>
+                </thead>
+                <tbody className="divide-y bg-background">
+                  {rows.map((row, i) => (
+                    <tr key={i} className={cn(row.duplicate && !row.selected && 'bg-muted/40 text-muted-foreground')}>
+                      <td className="px-2 py-1.5">
+                        <Checkbox
+                          checked={row.selected}
+                          onCheckedChange={(checked) =>
+                            setRows((prev) =>
+                              prev ? prev.map((r, j) => (j === i ? { ...r, selected: checked === true } : r)) : prev,
+                            )
+                          }
+                        />
+                      </td>
+                      <td className="whitespace-nowrap px-2 py-1.5">
+                        {row.date}
+                        {row.duplicate && <span className="ml-1 text-xs">(dup)</span>}
+                      </td>
+                      <td className="max-w-64 truncate px-2 py-1.5">{row.description}</td>
+                      <td className="px-2 py-1.5">
+                        <select
+                          className="h-7 rounded-md border border-input bg-background px-1.5 text-xs shadow-xs"
+                          value={row.category}
+                          onChange={(e) =>
+                            setRows((prev) =>
+                              prev ? prev.map((r, j) => (j === i ? { ...r, category: e.target.value } : r)) : prev,
+                            )
+                          }
+                        >
+                          {categories
+                            .filter((c) => c.type === row.type)
+                            .map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.emoji} {c.name}
+                              </option>
+                            ))}
+                        </select>
+                      </td>
+                      <td
+                        className={cn(
+                          'px-2 py-1.5 text-right tabular-nums',
+                          row.type === 'income' && 'text-emerald-600',
+                        )}
+                      >
+                        {row.type === 'income' ? '+' : '−'}
+                        {formatINRExact(row.amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Button disabled={selectedCount === 0 || busy !== null} onClick={doImport}>
+              Import {selectedCount} transactions
+            </Button>
+          </CardContent>
+        </Card>
       )}
     </div>
   )

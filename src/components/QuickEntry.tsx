@@ -1,5 +1,10 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { Sparkles, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 import { fileQueryKey, useAccounts, useCategories, useFileQuery } from '../hooks/useData'
 import { makeTransaction, useAllTransactions, useTransactionMutations } from '../hooks/useTransactions'
 import { hasGeminiKey, parseWithGemini, GeminiError, NoGeminiKeyError } from '../lib/gemini'
@@ -13,10 +18,13 @@ import type { ParsedEntry, TransactionType } from '../lib/types'
 const TYPE_CYCLE: TransactionType[] = ['expense', 'income', 'transfer']
 
 const typeStyles: Record<TransactionType, string> = {
-  expense: 'bg-slate-200 text-slate-700',
-  income: 'bg-emerald-100 text-emerald-700',
-  transfer: 'bg-sky-100 text-sky-700',
+  expense: 'bg-secondary text-secondary-foreground',
+  income: 'bg-emerald-50 text-emerald-700',
+  transfer: 'bg-sky-50 text-sky-700',
 }
+
+const fieldClass =
+  'h-8 rounded-md border border-input bg-background px-2 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40'
 
 export default function QuickEntry() {
   const { categories, addCategory } = useCategories()
@@ -166,14 +174,13 @@ export default function QuickEntry() {
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
+    <Card className="gap-3 p-4">
       <div className="flex gap-2">
-        <input
-          className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
+        <Input
           placeholder={
             hasGeminiKey()
-              ? 'Quick add: "2 tea of 5", "paid credit card 3200", "salary 90000 yesterday"…'
-              : 'Quick add: "tea 10", "coffee 30 and auto 60"…'
+              ? '"2 tea of 5", "paid credit card 3200", "23k left in hdfc"…'
+              : '"tea 10", "coffee 30 and auto 60"…'
           }
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -181,35 +188,31 @@ export default function QuickEntry() {
             if (e.key === 'Enter') void parse()
           }}
         />
-        <button
-          type="button"
-          onClick={() => void parse()}
-          disabled={parsing || !text.trim()}
-          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {parsing ? 'Parsing…' : 'Parse'}
-        </button>
+        <Button onClick={() => void parse()} disabled={parsing || !text.trim()}>
+          <Sparkles data-icon="inline-start" />
+          {parsing ? 'Parsing…' : 'Add'}
+        </Button>
       </div>
-      {notice && <p className="mt-2 text-xs text-slate-500">{notice}</p>}
+      {notice && <p className="text-xs text-muted-foreground">{notice}</p>}
       {entries.length > 0 && (
-        <div className="mt-3 space-y-2">
+        <div className="space-y-2">
           {entries.map((entry, i) => (
-            <div key={i} className="flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+            <div key={i} className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2">
               <button
                 type="button"
                 onClick={() => cycleType(i)}
-                className={`rounded-full px-2 py-0.5 text-xs font-medium ${typeStyles[entry.type]}`}
+                className={cn('rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors', typeStyles[entry.type])}
                 title="Toggle expense/income/transfer"
               >
                 {entry.type}
               </button>
               <input
-                className="min-w-0 flex-1 basis-28 rounded border border-slate-300 bg-white px-2 py-1 text-sm"
+                className={cn(fieldClass, 'min-w-0 flex-1 basis-28')}
                 value={entry.description}
                 onChange={(e) => updateEntry(i, { description: e.target.value })}
               />
               <input
-                className="w-24 rounded border border-slate-300 bg-white px-2 py-1 text-right text-sm"
+                className={cn(fieldClass, 'w-24 text-right tabular-nums')}
                 type="number"
                 step="0.01"
                 min="0"
@@ -218,7 +221,7 @@ export default function QuickEntry() {
               />
               {entry.type !== 'transfer' && (
                 <select
-                  className="min-w-0 max-w-44 rounded border border-slate-300 bg-white px-2 py-1 text-sm"
+                  className={cn(fieldClass, 'min-w-0 max-w-44')}
                   value={entry.category}
                   onChange={(e) => updateEntry(i, { category: e.target.value })}
                 >
@@ -238,9 +241,7 @@ export default function QuickEntry() {
               )}
               {accounts.length > 0 && (
                 <select
-                  className={`min-w-0 max-w-40 rounded border bg-white px-2 py-1 text-sm ${
-                    entry.account ? 'border-slate-300' : 'border-red-400 text-red-600'
-                  }`}
+                  className={cn(fieldClass, 'min-w-0 max-w-40', !entry.account && 'border-red-300 text-red-600')}
                   value={entry.account ?? ''}
                   onChange={(e) => updateEntry(i, { account: e.target.value || undefined })}
                 >
@@ -254,13 +255,13 @@ export default function QuickEntry() {
               )}
               {entry.type === 'transfer' && accounts.length > 0 && (
                 <>
-                  <span className="text-xs text-slate-400">→</span>
+                  <span className="text-xs text-muted-foreground">→</span>
                   <select
-                    className={`min-w-0 max-w-40 rounded border bg-white px-2 py-1 text-sm ${
-                      entry.toAccount && entry.toAccount !== entry.account
-                        ? 'border-slate-300'
-                        : 'border-red-400 text-red-600'
-                    }`}
+                    className={cn(
+                      fieldClass,
+                      'min-w-0 max-w-40',
+                      (!entry.toAccount || entry.toAccount === entry.account) && 'border-red-300 text-red-600',
+                    )}
                     value={entry.toAccount ?? ''}
                     onChange={(e) => updateEntry(i, { toAccount: e.target.value || undefined })}
                   >
@@ -276,13 +277,13 @@ export default function QuickEntry() {
                 </>
               )}
               <input
-                className="rounded border border-slate-300 bg-white px-2 py-1 text-sm"
+                className={fieldClass}
                 type="date"
                 value={entry.date ?? todayISO()}
                 onChange={(e) => updateEntry(i, { date: e.target.value })}
               />
               {entry.quantity && entry.unitAmount ? (
-                <span className="text-xs text-slate-500">
+                <span className="text-xs text-muted-foreground">
                   {entry.quantity} × {formatINRExact(entry.unitAmount)}
                 </span>
               ) : null}
@@ -292,35 +293,32 @@ export default function QuickEntry() {
                   {accounts.find((a) => a.id === entry.account)?.name ?? entry.account}
                 </span>
               ) : null}
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className="ml-auto text-muted-foreground hover:text-destructive"
                 onClick={() => removeEntry(i)}
-                className="ml-auto rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50"
+                aria-label="Remove entry"
               >
-                ✕
-              </button>
+                <X />
+              </Button>
             </div>
           ))}
           <div className="flex items-center justify-end gap-2">
             {missingAccount && <span className="text-xs text-red-600">Pick accounts for the highlighted items</span>}
-            <button
-              type="button"
-              onClick={() => setEntries([])}
-              className="rounded-md px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
-            >
+            <Button variant="ghost" size="sm" onClick={() => setEntries([])}>
               Discard
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              size="sm"
               onClick={saveEntries}
               disabled={missingAccount || entries.some((e) => !Number.isFinite(e.totalAmount) || e.totalAmount <= 0)}
-              className="rounded-md bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50"
             >
               Save all ({entries.length})
-            </button>
+            </Button>
           </div>
         </div>
       )}
-    </div>
+    </Card>
   )
 }

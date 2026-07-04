@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { clearFileCache, getConfig, setConfig } from '../lib/cache'
 import { flush, resetAllData } from '../lib/sync'
 import { useSyncState } from '../hooks/useSyncState'
@@ -21,7 +24,7 @@ export default function SettingsPage() {
   const { data: aiMemory } = useFileQuery<AiMemoryFile>(AI_MEMORY_PATH, emptyAiMemory)
 
   const repo = getConfig('dataRepo')
-  const branch = getConfig('dataBranch') ?? 'data'
+  const branch = getConfig('dataBranch') ?? 'main'
 
   function note(msg: string) {
     setSaved(msg)
@@ -30,220 +33,235 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-xl space-y-4">
-      <h1 className="text-2xl font-semibold">Settings</h1>
+      <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
 
-      <section className="space-y-2 rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold">Data store</h2>
-        <p className="text-sm text-slate-600">
-          Data lives on the <code className="rounded bg-slate-100 px-1">{branch}</code> branch of{' '}
-          <a
-            className="text-sky-600 underline"
-            href={`https://github.com/${repo}/tree/${branch}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            {repo}
-          </a>
-          . Sync status: {sync.status}
-          {sync.pendingCount > 0 ? ` (${sync.pendingCount} pending)` : ''}.
-        </p>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => void flush()}
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100"
-          >
-            Sync now
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (sync.pendingCount > 0 && !confirm('There are unpushed changes that will be lost. Continue?')) return
-              clearFileCache()
-              void queryClient.invalidateQueries()
-              note('Local cache cleared — refetching from GitHub.')
-            }}
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100"
-          >
-            Force full re-sync
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (!confirm('Sign out? The GitHub token will be removed from this browser.')) return
-              setConfig('githubToken', null)
-              location.reload()
-            }}
-            className="rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50"
-          >
-            Sign out
-          </button>
-        </div>
-      </section>
-
-      <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold">Accounts</h2>
-        <ul className="divide-y divide-slate-100">
-          {accounts.map((acc) => (
-            <li key={acc.id} className="flex flex-wrap items-center gap-2 py-2">
-              <span className="text-lg">{accountTypeEmoji[acc.type]}</span>
-              <input
-                className="min-w-0 flex-1 rounded-md border border-slate-300 px-2 py-1 text-sm"
-                value={acc.name}
-                onChange={(e) => updateAccount(acc.id, { name: e.target.value })}
-              />
-              <label className="flex items-center gap-1 text-xs text-slate-500">
-                start ₹
-                <input
-                  className="w-28 rounded-md border border-slate-300 px-2 py-1 text-right text-sm"
-                  type="number"
-                  step="0.01"
-                  value={acc.startingBalance}
-                  onChange={(e) => updateAccount(acc.id, { startingBalance: Number(e.target.value) || 0 })}
-                />
-              </label>
-            </li>
-          ))}
-        </ul>
-        <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
-          <input
-            className="min-w-0 flex-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-            placeholder="New account name"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-          />
-          <select
-            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-            value={newType}
-            onChange={(e) => setNewType(e.target.value as AccountType)}
-          >
-            {(Object.keys(accountTypeLabel) as AccountType[]).map((t) => (
-              <option key={t} value={t}>
-                {accountTypeEmoji[t]} {accountTypeLabel[t]}
-              </option>
-            ))}
-          </select>
-          <input
-            className="w-28 rounded-md border border-slate-300 px-2 py-1.5 text-right text-sm"
-            type="number"
-            step="0.01"
-            placeholder="balance ₹"
-            value={newBalance}
-            onChange={(e) => setNewBalance(e.target.value)}
-          />
-          <button
-            type="button"
-            disabled={!newName.trim()}
-            onClick={() => {
-              let id = makeAccountId(newName)
-              if (accounts.some((a) => a.id === id)) id = `${id}-${accounts.length + 1}`
-              addAccounts([
-                {
-                  id,
-                  name: newName.trim(),
-                  type: newType,
-                  startingBalance: Number(newBalance) || 0,
-                  createdAt: new Date().toISOString(),
-                },
-              ])
-              setNewName('')
-              setNewBalance('')
-              note('Account added.')
-            }}
-            className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-          >
-            Add
-          </button>
-        </div>
-      </section>
-
-      <section className="space-y-2 rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold">Gemini API key</h2>
-        <p className="text-sm text-slate-600">
-          Powers AI quick entry and CSV categorization. Get one free at{' '}
-          <a className="text-sky-600 underline" href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">
-            aistudio.google.com/apikey
-          </a>
-          .
-        </p>
-        <div className="flex gap-2">
-          <input
-            className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
-            type="password"
-            placeholder="AIza…"
-            value={geminiKey}
-            onChange={(e) => setGeminiKey(e.target.value)}
-          />
-          <button
-            type="button"
-            onClick={() => {
-              setConfig('geminiKey', geminiKey.trim() || null)
-              note(geminiKey.trim() ? 'Gemini key saved.' : 'Gemini key removed.')
-            }}
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white"
-          >
-            Save
-          </button>
-        </div>
-      </section>
-
-      <section className="space-y-2 rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold">AI memory</h2>
-        <p className="text-sm text-slate-600">
-          What the AI has learned about your spending, regenerated after quick-entry saves and
-          fed into every parse to improve classification.
-        </p>
-        {aiMemory?.summary ? (
-          <>
-            <p className="whitespace-pre-line rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
-              {aiMemory.summary}
-            </p>
-            <p className="text-xs text-slate-400">
-              Updated{' '}
-              {new Date(aiMemory.updatedAt).toLocaleString('en-IN', {
-                day: 'numeric',
-                month: 'short',
-                hour: '2-digit',
-                minute: '2-digit',
-              })}{' '}
-              · based on {aiMemory.txCount} transactions
-            </p>
-          </>
-        ) : (
-          <p className="text-sm text-slate-400">
-            Nothing yet — it builds up as you save transactions through quick entry.
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Data store</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Data lives on the <code className="rounded bg-muted px-1 py-0.5 text-xs">{branch}</code> branch of{' '}
+            <a
+              className="text-primary underline underline-offset-4"
+              href={`https://github.com/${repo}/tree/${branch}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {repo}
+            </a>
+            . Sync status: {sync.status}
+            {sync.pendingCount > 0 ? ` (${sync.pendingCount} pending)` : ''}.
           </p>
-        )}
-      </section>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={() => void flush()}>
+              Sync now
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (sync.pendingCount > 0 && !confirm('There are unpushed changes that will be lost. Continue?')) return
+                clearFileCache()
+                void queryClient.invalidateQueries()
+                note('Local cache cleared — refetching from GitHub.')
+              }}
+            >
+              Force full re-sync
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+              onClick={() => {
+                if (!confirm('Sign out? The GitHub token will be removed from this browser.')) return
+                setConfig('githubToken', null)
+                location.reload()
+              }}
+            >
+              Sign out
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
-      <section className="space-y-2 rounded-lg border border-red-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-red-700">Danger zone</h2>
-        <p className="text-sm text-slate-600">
-          Reset deletes every transaction, all accounts, budgets, and the AI memory from the
-          data repo, and restores default categories. Your GitHub and Gemini keys stay. Old
-          data remains in the repo's git history until you delete the repo itself.
-        </p>
-        <button
-          type="button"
-          disabled={resetting}
-          onClick={async () => {
-            if (!confirm('Delete ALL data — every transaction, account, budget, and AI memory?')) return
-            if (prompt('This cannot be undone from the app. Type DELETE to confirm:') !== 'DELETE') return
-            setResetting(true)
-            try {
-              await resetAllData()
-              queryClient.clear()
-              location.reload()
-            } catch (e) {
-              note(`Reset failed: ${e instanceof Error ? e.message : e}`)
-              setResetting(false)
-            }
-          }}
-          className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {resetting ? 'Resetting…' : 'Reset everything'}
-        </button>
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Accounts</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="divide-y">
+            {accounts.map((acc) => (
+              <div key={acc.id} className="flex flex-wrap items-center gap-2 py-2">
+                <span className="text-lg">{accountTypeEmoji[acc.type]}</span>
+                <Input
+                  className="h-8 min-w-0 flex-1"
+                  value={acc.name}
+                  onChange={(e) => updateAccount(acc.id, { name: e.target.value })}
+                />
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  start ₹
+                  <Input
+                    className="h-8 w-28 text-right tabular-nums"
+                    type="number"
+                    step="0.01"
+                    value={acc.startingBalance}
+                    onChange={(e) => updateAccount(acc.id, { startingBalance: Number(e.target.value) || 0 })}
+                  />
+                </label>
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+            <Input
+              className="h-8 min-w-0 flex-1"
+              placeholder="New account name"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+            />
+            <select
+              className="h-8 rounded-md border border-input bg-background px-2 text-sm shadow-xs"
+              value={newType}
+              onChange={(e) => setNewType(e.target.value as AccountType)}
+            >
+              {(Object.keys(accountTypeLabel) as AccountType[]).map((t) => (
+                <option key={t} value={t}>
+                  {accountTypeEmoji[t]} {accountTypeLabel[t]}
+                </option>
+              ))}
+            </select>
+            <Input
+              className="h-8 w-28 text-right tabular-nums"
+              type="number"
+              step="0.01"
+              placeholder="balance ₹"
+              value={newBalance}
+              onChange={(e) => setNewBalance(e.target.value)}
+            />
+            <Button
+              size="sm"
+              disabled={!newName.trim()}
+              onClick={() => {
+                let id = makeAccountId(newName)
+                if (accounts.some((a) => a.id === id)) id = `${id}-${accounts.length + 1}`
+                addAccounts([
+                  {
+                    id,
+                    name: newName.trim(),
+                    type: newType,
+                    startingBalance: Number(newBalance) || 0,
+                    createdAt: new Date().toISOString(),
+                  },
+                ])
+                setNewName('')
+                setNewBalance('')
+                note('Account added.')
+              }}
+            >
+              Add
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">AI memory</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <p className="text-sm text-muted-foreground">
+            What the AI has learned about your spending, regenerated after quick-entry saves and
+            fed into every parse to improve classification.
+          </p>
+          {aiMemory?.summary ? (
+            <>
+              <p className="whitespace-pre-line rounded-lg bg-muted/60 px-3 py-2 text-sm">{aiMemory.summary}</p>
+              <p className="text-xs text-muted-foreground/70">
+                Updated{' '}
+                {new Date(aiMemory.updatedAt).toLocaleString('en-IN', {
+                  day: 'numeric',
+                  month: 'short',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}{' '}
+                · based on {aiMemory.txCount} transactions
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground/70">
+              Nothing yet — it builds up as you save transactions through quick entry.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Gemini API key</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Powers AI quick entry and CSV categorization. Get one free at{' '}
+            <a
+              className="text-primary underline underline-offset-4"
+              href="https://aistudio.google.com/apikey"
+              target="_blank"
+              rel="noreferrer"
+            >
+              aistudio.google.com/apikey
+            </a>
+            .
+          </p>
+          <div className="flex gap-2">
+            <Input
+              type="password"
+              placeholder="AIza…"
+              value={geminiKey}
+              onChange={(e) => setGeminiKey(e.target.value)}
+            />
+            <Button
+              onClick={() => {
+                setConfig('geminiKey', geminiKey.trim() || null)
+                note(geminiKey.trim() ? 'Gemini key saved.' : 'Gemini key removed.')
+              }}
+            >
+              Save
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-red-200">
+        <CardHeader>
+          <CardTitle className="text-sm text-red-600">Danger zone</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Reset deletes every transaction, all accounts, budgets, and the AI memory from the
+            data repo, and restores default categories. Your GitHub and Gemini keys stay. Old
+            data remains in the repo's git history until you delete the repo itself.
+          </p>
+          <Button
+            variant="destructive"
+            disabled={resetting}
+            onClick={async () => {
+              if (!confirm('Delete ALL data — every transaction, account, budget, and AI memory?')) return
+              if (prompt('This cannot be undone from the app. Type DELETE to confirm:') !== 'DELETE') return
+              setResetting(true)
+              try {
+                await resetAllData()
+                queryClient.clear()
+                location.reload()
+              } catch (e) {
+                note(`Reset failed: ${e instanceof Error ? e.message : e}`)
+                setResetting(false)
+              }
+            }}
+          >
+            {resetting ? 'Resetting…' : 'Reset everything'}
+          </Button>
+        </CardContent>
+      </Card>
 
       {saved && <p className="text-sm text-emerald-700">{saved}</p>}
     </div>

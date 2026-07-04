@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 import CategorySpendChart from '../components/CategorySpendChart'
 import MonthPicker from '../components/MonthPicker'
 import QuickEntry from '../components/QuickEntry'
@@ -43,9 +45,9 @@ export default function DashboardPage() {
     .slice(0, 3)
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-4">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
         <MonthPicker month={month} onChange={setMonth} />
       </div>
 
@@ -55,39 +57,43 @@ export default function DashboardPage() {
 
       {accounts.length > 0 && (
         <div className="flex gap-3 overflow-x-auto pb-1">
-          <div className="min-w-36 shrink-0 rounded-lg bg-slate-900 px-4 py-3 text-white">
-            <p className="text-xs text-slate-300">Total balance</p>
-            <p className="mt-1 text-lg font-semibold">
+          <Card className="min-w-36 shrink-0 gap-1 border-primary bg-primary p-4 text-primary-foreground">
+            <p className="text-xs text-primary-foreground/70">Total balance</p>
+            <p className="text-lg font-semibold tabular-nums tracking-tight">
               {formatINR(accounts.reduce((sum, acc) => sum + (balances[acc.id] ?? 0), 0))}
             </p>
-          </div>
+          </Card>
           {accounts.map((acc) => (
-            <div key={acc.id} className="min-w-36 shrink-0 rounded-lg border border-slate-200 bg-white px-4 py-3">
-              <p className="flex items-center gap-1.5 text-xs text-slate-500">
+            <Card key={acc.id} className="min-w-36 shrink-0 gap-1 p-4">
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <span aria-hidden>{accountTypeEmoji[acc.type]}</span>
                 {acc.name}
               </p>
               <p
-                className={`mt-1 text-lg font-semibold ${
-                  (balances[acc.id] ?? 0) < 0 ? 'text-red-700' : 'text-slate-900'
-                }`}
+                className={cn(
+                  'text-lg font-semibold tabular-nums tracking-tight',
+                  (balances[acc.id] ?? 0) < 0 && 'text-red-600',
+                )}
               >
                 {formatINR(balances[acc.id] ?? 0)}
               </p>
-            </div>
+            </Card>
           ))}
         </div>
       )}
 
       {warnings.length > 0 && (
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           {warnings.map((w) => (
             <Link
               key={w.category.id}
               to="/budgets"
-              className={`block rounded-md px-3 py-2 text-sm ${
-                w.ratio > 1 ? 'bg-red-50 text-red-800' : 'bg-amber-50 text-amber-800'
-              }`}
+              className={cn(
+                'block rounded-lg border px-3 py-2 text-sm',
+                w.ratio > 1
+                  ? 'border-red-200 bg-red-50 text-red-800'
+                  : 'border-amber-200 bg-amber-50 text-amber-800',
+              )}
             >
               ⚠ {w.category.emoji} {w.category.name}: {formatINR(w.spent)} of {formatINR(w.limit)}{' '}
               {w.ratio > 1 ? `— over by ${formatINR(w.spent - w.limit)}` : '— nearing limit'}
@@ -96,20 +102,28 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="mb-2 text-sm font-medium text-slate-700">Spend by category</h2>
-        <CategorySpendChart transactions={current} />
-      </div>
+      <Card className="gap-3">
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">Spend by category</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <CategorySpendChart transactions={current} />
+        </CardContent>
+      </Card>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="mb-2 text-sm font-medium text-slate-700">Income vs expense — last 6 months</h2>
-        <TrendChart byMonth={byMonth} months={months} />
-      </div>
+      <Card className="gap-3">
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">Income vs expense — last 6 months</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <TrendChart byMonth={byMonth} months={months} />
+        </CardContent>
+      </Card>
 
       <div>
         <div className="mb-2 flex items-baseline justify-between">
-          <h2 className="text-sm font-medium text-slate-700">Recent transactions</h2>
-          <Link to="/transactions" className="text-xs text-sky-600 underline">
+          <h2 className="text-sm font-medium text-muted-foreground">Recent transactions</h2>
+          <Link to="/transactions" className="text-xs text-primary underline-offset-4 hover:underline">
             view all
           </Link>
         </div>

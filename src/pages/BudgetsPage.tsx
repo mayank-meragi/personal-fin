@@ -18,7 +18,7 @@ export default function BudgetsPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-4">
-        <h1 className="text-2xl font-semibold">Budgets</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Budgets</h1>
         <MonthPicker month={month} onChange={setMonth} />
       </div>
       <div className="grid gap-3 md:grid-cols-2">

@@ -1,4 +1,8 @@
 import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { getConfig, setConfig } from '../lib/cache'
 import { validateToken } from '../lib/github'
 import { ensureSeedFiles } from '../lib/sync'
@@ -19,7 +23,7 @@ export default function Onboarding({ expired, onDone }: Props) {
   async function connect() {
     setError(null)
     if (!repo.includes('/')) {
-      setError('Repo must be in the form owner/name, e.g. mayank-meragi/personal-fin')
+      setError('Repo must be in the form owner/name, e.g. mayank-meragi/finance-data')
       return
     }
     setChecking(true)
@@ -41,90 +45,96 @@ export default function Onboarding({ expired, onDone }: Props) {
   }
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-10">
-      <h1 className="text-2xl font-semibold">₹ Tracker setup</h1>
+    <div className="mx-auto max-w-xl space-y-4 px-4 py-10">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">₹ Tracker</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Your finances, stored as files in your own private GitHub repo.
+        </p>
+      </div>
       {expired && (
-        <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           Your GitHub token was rejected — it has likely expired. Create a new one and paste it below.
         </p>
       )}
-      <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">
-        <p className="font-medium text-slate-900">Create a fine-grained GitHub token</p>
-        <ol className="mt-2 list-decimal space-y-1 pl-5">
-          <li>
-            Open{' '}
-            <a
-              className="break-all text-sky-600 underline"
-              href="https://github.com/settings/personal-access-tokens/new"
-              target="_blank"
-              rel="noreferrer"
-            >
-              github.com/settings/personal-access-tokens/new
-            </a>
-          </li>
-          <li>Repository access → <b>Only select repositories</b> → pick your data repo</li>
-          <li>Permissions → Repository permissions → <b>Contents: Read and write</b></li>
-          <li>Set expiration (max 1 year), generate, and copy the token</li>
-        </ol>
-        <p className="mt-2 text-xs text-slate-500">
-          The token is stored only in this browser's localStorage and sent only to api.github.com.
-        </p>
-      </div>
-      <div className="mt-4 space-y-3 rounded-lg border border-slate-200 bg-white p-4">
-        <label className="block text-sm">
-          <span className="font-medium">Data repo (owner/name)</span>
-          <input
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
-            placeholder="you/finance-data"
-            value={repo}
-            onChange={(e) => setRepo(e.target.value)}
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="font-medium">Data branch</span>
-          <input
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
-            value={branch}
-            onChange={(e) => setBranch(e.target.value)}
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="font-medium">GitHub token</span>
-          <input
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
-            type="password"
-            placeholder="github_pat_…"
-            value={token}
-            onChange={(e) => setToken(e.target.value)}
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="font-medium">Gemini API key (optional — enables AI quick entry)</span>
-          <input
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
-            type="password"
-            placeholder="AIza…"
-            value={geminiKey}
-            onChange={(e) => setGeminiKey(e.target.value)}
-          />
-          <span className="mt-1 block text-xs text-slate-500">
-            Get one free at{' '}
-            <a className="text-sky-600 underline" href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">
-              aistudio.google.com/apikey
-            </a>
-            . Without it, quick entry falls back to simple pattern matching.
-          </span>
-        </label>
-        {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-        <button
-          type="button"
-          disabled={checking || !repo || !token}
-          onClick={() => void connect()}
-          className="w-full rounded-md bg-slate-900 px-4 py-2 font-medium text-white disabled:opacity-50"
-        >
-          {checking ? 'Checking…' : 'Connect'}
-        </button>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Create a fine-grained GitHub token</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground">
+          <ol className="list-decimal space-y-1 pl-5">
+            <li>
+              Open{' '}
+              <a
+                className="break-all text-primary underline underline-offset-4"
+                href="https://github.com/settings/personal-access-tokens/new"
+                target="_blank"
+                rel="noreferrer"
+              >
+                github.com/settings/personal-access-tokens/new
+              </a>
+            </li>
+            <li>
+              Repository access → <b className="text-foreground">Only select repositories</b> → pick your data repo
+            </li>
+            <li>
+              Permissions → Repository permissions → <b className="text-foreground">Contents: Read and write</b>
+            </li>
+            <li>Set expiration (max 1 year), generate, and copy the token</li>
+          </ol>
+          <p className="mt-3 text-xs">
+            The token is stored only in this browser's localStorage and sent only to api.github.com.
+          </p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="ob-repo">Data repo (owner/name)</Label>
+            <Input id="ob-repo" placeholder="you/finance-data" value={repo} onChange={(e) => setRepo(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ob-branch">Data branch</Label>
+            <Input id="ob-branch" value={branch} onChange={(e) => setBranch(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ob-token">GitHub token</Label>
+            <Input
+              id="ob-token"
+              type="password"
+              placeholder="github_pat_…"
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ob-gemini">Gemini API key (optional — enables AI quick entry)</Label>
+            <Input
+              id="ob-gemini"
+              type="password"
+              placeholder="AIza…"
+              value={geminiKey}
+              onChange={(e) => setGeminiKey(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Get one free at{' '}
+              <a
+                className="text-primary underline underline-offset-4"
+                href="https://aistudio.google.com/apikey"
+                target="_blank"
+                rel="noreferrer"
+              >
+                aistudio.google.com/apikey
+              </a>
+              . Without it, quick entry falls back to simple pattern matching.
+            </p>
+          </div>
+          {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+          <Button className="w-full" disabled={checking || !repo || !token} onClick={() => void connect()}>
+            {checking ? 'Checking…' : 'Connect'}
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   )
 }

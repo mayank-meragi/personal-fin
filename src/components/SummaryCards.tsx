@@ -1,3 +1,5 @@
+import { Card } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 import { formatINR } from '../lib/money'
 import type { MonthTotals } from '../lib/stats'
 
@@ -16,12 +18,12 @@ export default function SummaryCards({ current, previousExpense }: Props) {
     {
       label: 'Net',
       value: formatINR(current.net),
-      tone: current.net < 0 ? 'text-red-700' : 'text-emerald-700',
+      tone: current.net < 0 ? 'text-red-600' : 'text-emerald-700',
     },
     {
       label: 'Spend vs last month',
       value: deltaPct === null ? '—' : `${delta >= 0 ? '+' : ''}${deltaPct}%`,
-      tone: delta > 0 ? 'text-red-700' : 'text-emerald-700',
+      tone: delta > 0 ? 'text-red-600' : 'text-emerald-700',
       sub: deltaPct === null ? 'no data for last month' : `${delta >= 0 ? '+' : '−'}${formatINR(Math.abs(delta))}`,
     },
   ]
@@ -29,11 +31,11 @@ export default function SummaryCards({ current, previousExpense }: Props) {
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
       {tiles.map((tile) => (
-        <div key={tile.label} className="rounded-lg border border-slate-200 bg-white p-4">
-          <p className="text-xs text-slate-500">{tile.label}</p>
-          <p className={`mt-1 text-2xl font-semibold ${tile.tone ?? 'text-slate-900'}`}>{tile.value}</p>
-          {tile.sub && <p className="mt-0.5 text-xs text-slate-500">{tile.sub}</p>}
-        </div>
+        <Card key={tile.label} className="gap-1 p-4">
+          <p className="text-xs text-muted-foreground">{tile.label}</p>
+          <p className={cn('text-2xl font-semibold tracking-tight', tile.tone)}>{tile.value}</p>
+          {tile.sub && <p className="text-xs text-muted-foreground">{tile.sub}</p>}
+        </Card>
       ))}
     </div>
   )

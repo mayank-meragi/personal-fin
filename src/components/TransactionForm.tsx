@@ -1,4 +1,22 @@
 import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { cn } from '@/lib/utils'
 import { useAccounts, useCategories } from '../hooks/useData'
 import { makeTransaction } from '../hooks/useTransactions'
 import { todayISO } from '../lib/dates'
@@ -65,125 +83,112 @@ export default function TransactionForm({ initial, onSave, onClose }: Props) {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-30 flex items-end justify-center bg-slate-900/40 sm:items-center sm:p-4"
-      onClick={onClose}
-    >
-      <form
-        onSubmit={submit}
-        onClick={(e) => e.stopPropagation()}
-        className="max-h-[85vh] w-full max-w-md space-y-3 overflow-y-auto rounded-t-2xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-xl sm:rounded-lg sm:pb-5"
-      >
-        <h2 className="text-lg font-semibold">{initial ? 'Edit transaction' : 'Add transaction'}</h2>
-        <div className="flex gap-2">
-          {(['expense', 'income', 'transfer'] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setType(t)}
-              className={`flex-1 rounded-md border px-3 py-1.5 text-sm capitalize ${
-                type === t ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white'
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-        <label className="block text-sm">
-          <span className="font-medium">Amount (₹)</span>
-          <input
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
-            type="number"
-            step="0.01"
-            min="0"
-            required
-            autoFocus
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="font-medium">Date</span>
-          <input
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
-            type="date"
-            required
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </label>
-        {!isTransfer && (
-          <label className="block text-sm">
-            <span className="font-medium">Category</span>
-            <select
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            >
-              {typeCategories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.emoji} {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        {accounts.length > 0 && (
-          <label className="block text-sm">
-            <span className="font-medium">{isTransfer ? 'From account' : 'Account'}</span>
-            <select
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
-              value={account}
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="top-auto bottom-0 max-h-[90vh] w-full max-w-full translate-y-0 overflow-y-auto rounded-b-none rounded-t-2xl pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:top-1/2 sm:bottom-auto sm:max-w-md sm:-translate-y-1/2 sm:rounded-2xl sm:pb-6">
+        <DialogHeader>
+          <DialogTitle>{initial ? 'Edit transaction' : 'Add transaction'}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-4">
+          <div className="grid grid-cols-3 gap-2">
+            {(['expense', 'income', 'transfer'] as const).map((t) => (
+              <Button
+                key={t}
+                type="button"
+                variant={type === t ? 'default' : 'outline'}
+                className={cn('capitalize')}
+                onClick={() => setType(t)}
+              >
+                {t}
+              </Button>
+            ))}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="tx-amount">Amount (₹)</Label>
+            <Input
+              id="tx-amount"
+              type="number"
+              step="0.01"
+              min="0"
               required
-              onChange={(e) => setAccount(e.target.value)}
-            >
-              {!account && <option value="">Select an account…</option>}
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        {isTransfer && accounts.length > 0 && (
-          <label className="block text-sm">
-            <span className="font-medium">To account</span>
-            <select
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
-              value={toAccount}
-              required
-              onChange={(e) => setToAccount(e.target.value)}
-            >
-              {!toAccount && <option value="">Select an account…</option>}
-              {accounts
-                .filter((a) => a.id !== account)
-                .map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-            </select>
-          </label>
-        )}
-        <label className="block text-sm">
-          <span className="font-medium">Note</span>
-          <input
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="tea, auto to office…"
-          />
-        </label>
-        <div className="flex justify-end gap-2 pt-1">
-          <button type="button" onClick={onClose} className="rounded-md px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">
-            Cancel
-          </button>
-          <button type="submit" className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white">
-            Save
-          </button>
-        </div>
-      </form>
-    </div>
+              autoFocus
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="tx-date">Date</Label>
+            <Input id="tx-date" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+          {!isTransfer && (
+            <div className="space-y-1.5">
+              <Label>Category</Label>
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Pick a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {typeCategories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.emoji} {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {accounts.length > 0 && (
+            <div className="space-y-1.5">
+              <Label>{isTransfer ? 'From account' : 'Account'}</Label>
+              <Select value={account || undefined} onValueChange={setAccount}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select an account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {isTransfer && accounts.length > 0 && (
+            <div className="space-y-1.5">
+              <Label>To account</Label>
+              <Select value={toAccount || undefined} onValueChange={setToAccount}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select an account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts
+                    .filter((a) => a.id !== account)
+                    .map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label htmlFor="tx-note">Note</Label>
+            <Input
+              id="tx-note"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="tea, auto to office…"
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit">Save</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }

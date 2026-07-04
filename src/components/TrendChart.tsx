@@ -46,7 +46,12 @@ export default function TrendChart({ byMonth, months }: Props) {
         />
         <Tooltip
           formatter={(value, name) => [formatINR(Number(value)), name === 'expense' ? 'Expense' : 'Income']}
-          contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: palette.gridline }}
+          contentStyle={{
+            fontSize: 12,
+            borderRadius: 10,
+            border: '1px solid var(--border)',
+            boxShadow: '0 4px 12px rgb(0 0 0 / 0.08)',
+          }}
         />
         <Legend
           formatter={(value) => (

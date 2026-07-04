@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { Plus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import MonthPicker from '../components/MonthPicker'
 import TransactionForm from '../components/TransactionForm'
 import TransactionList from '../components/TransactionList'
@@ -19,19 +21,19 @@ export default function TransactionsPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-4">
-        <h1 className="text-2xl font-semibold">Transactions</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Activity</h1>
         <MonthPicker month={month} onChange={setMonth} />
-        <span className="text-sm text-slate-500">spent {formatINR(spent)}</span>
-        <button
-          type="button"
+        <span className="text-sm text-muted-foreground tabular-nums">spent {formatINR(spent)}</span>
+        <Button
+          className="ml-auto"
           onClick={() => {
             setEditing(undefined)
             setFormOpen(true)
           }}
-          className="ml-auto rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white"
         >
-          + Add
-        </button>
+          <Plus data-icon="inline-start" />
+          Add
+        </Button>
       </div>
       <TransactionList
         transactions={transactions}

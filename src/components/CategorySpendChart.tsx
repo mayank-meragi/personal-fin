@@ -56,7 +56,12 @@ export default function CategorySpendChart({ transactions }: Props) {
         <Tooltip
           formatter={(value) => [formatINR(Number(value)), 'Spent']}
           cursor={{ fill: 'rgba(11,11,11,0.04)' }}
-          contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: palette.gridline }}
+          contentStyle={{
+            fontSize: 12,
+            borderRadius: 10,
+            border: '1px solid var(--border)',
+            boxShadow: '0 4px 12px rgb(0 0 0 / 0.08)',
+          }}
         />
         <Bar dataKey="amount" fill={palette.series1} barSize={20} radius={[0, 4, 4, 0]}>
           <LabelList
