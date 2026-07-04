@@ -73,8 +73,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-4">
-      <QuickEntry />
-
       <NetWorthHero
         totalBalance={totalBalance}
         series={heroSeries}
@@ -82,6 +80,8 @@ export default function DashboardPage() {
         thisMonthSpent={currentTotals.expense}
         accounts={accounts.map((a) => ({ id: a.id, name: a.name, balance: balances[a.id] ?? 0 }))}
       />
+
+      <QuickEntry />
 
       <UpcomingBills bills={upcoming} />
 
