@@ -224,8 +224,9 @@ export default function QuickEntry() {
 
   return (
     <Card className="gap-3 p-4">
-      <div className="flex gap-2">
+      <div className="space-y-2">
         <Input
+          className="border-transparent bg-transparent px-1 text-base shadow-none focus-visible:border-transparent focus-visible:ring-0"
           placeholder={
             hasGeminiKey()
               ? '"2 tea of 5", "paid credit card 3200", "23k left in hdfc"…'
@@ -237,29 +238,31 @@ export default function QuickEntry() {
             if (e.key === 'Enter') void parse()
           }}
         />
-        <Button
-          variant="outline"
-          size="icon"
-          aria-label="Attach a payment screenshot"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <ImagePlus />
-        </Button>
-        <Button onClick={() => void parse()} disabled={parsing || (!text.trim() && !image)}>
-          <Sparkles data-icon="inline-start" />
-          {parsing ? 'Parsing…' : 'Add'}
-        </Button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0]
-            if (f) attachImage(f)
-            e.target.value = ''
-          }}
-        />
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label="Attach a payment screenshot"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <ImagePlus />
+          </Button>
+          <Button onClick={() => void parse()} disabled={parsing || (!text.trim() && !image)}>
+            <Sparkles data-icon="inline-start" />
+            {parsing ? 'Parsing…' : 'Add'}
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) attachImage(f)
+              e.target.value = ''
+            }}
+          />
+        </div>
       </div>
       {image && (
         <div className="flex items-center gap-2">
