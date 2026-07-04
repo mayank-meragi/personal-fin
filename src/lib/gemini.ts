@@ -27,6 +27,8 @@ export interface ParseContext {
   balances?: Record<string, number>
   /** The stored AI memory about this user, injected for better classification */
   memory?: string
+  /** A shared payment screenshot / receipt to extract the transaction from */
+  image?: { mimeType: string; data: string }
 }
 
 function accountLine(a: Account, balances?: Record<string, number>): string {
@@ -76,6 +78,8 @@ ${accountLines}`
 ${context.memory}`
       : ''
   }
+- A payment-app screenshot or receipt image may be attached: extract merchant, amount, date,
+  and (if visible) the paying account from it. The text note, when present, adds context.
 - description: short lowercase noun phrase ("tea", "auto to office").
 Return ONLY the JSON array.`
 }
@@ -137,9 +141,15 @@ export async function parseWithGemini(
   accounts: Account[] = [],
   context: ParseContext = {},
 ): Promise<ParsedEntry[]> {
+  const parts: object[] = []
+  if (context.image) {
+    parts.push({ inline_data: { mime_type: context.image.mimeType, data: context.image.data } })
+  }
+  parts.push({ text: input || 'Extract the transaction(s) from the attached image.' })
+
   const text = await callGemini({
     system_instruction: { parts: [{ text: buildSystemPrompt(categories, accounts, context) }] },
-    contents: [{ parts: [{ text: input }] }],
+    contents: [{ parts }],
     generationConfig: {
       temperature: 0,
       response_mime_type: 'application/json',

@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Sparkles, X } from 'lucide-react'
+import { ImagePlus, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -37,6 +37,49 @@ export default function QuickEntry() {
   const [entries, setEntries] = useState<ParsedEntry[]>([])
   const [parsing, setParsing] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  const [image, setImage] = useState<{ mimeType: string; data: string; previewUrl: string } | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  function attachImage(blob: Blob) {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(',')[1]
+      setImage({
+        mimeType: blob.type || 'image/png',
+        data: base64,
+        previewUrl: URL.createObjectURL(blob),
+      })
+    }
+    reader.readAsDataURL(blob)
+  }
+
+  function clearImage() {
+    if (image) URL.revokeObjectURL(image.previewUrl)
+    setImage(null)
+  }
+
+  // Pick up anything shared into the PWA (the service worker stashes it in the Cache API)
+  useEffect(() => {
+    if (!('caches' in window)) return
+    void (async () => {
+      try {
+        const cache = await caches.open('pf-share')
+        const textRes = await cache.match('shared-text')
+        if (textRes) {
+          setText(await textRes.text())
+          await cache.delete('shared-text')
+        }
+        const imgRes = await cache.match('shared-image')
+        if (imgRes) {
+          attachImage(await imgRes.blob())
+          await cache.delete('shared-image')
+          setNotice('Screenshot received — hit Add to extract the transaction.')
+        }
+      } catch {
+        // Cache API unavailable (e.g. private mode) — sharing just won't prefill
+      }
+    })()
+  }, [])
 
   function withInferredAccounts(parsed: ParsedEntry[]): ParsedEntry[] {
     return parsed.map((e) => {
@@ -65,7 +108,7 @@ export default function QuickEntry() {
 
   async function parse() {
     const input = text.trim()
-    if (!input || parsing) return
+    if ((!input && !image) || parsing) return
     setParsing(true)
     setNotice(null)
     try {
@@ -73,6 +116,7 @@ export default function QuickEntry() {
         await parseWithGemini(input, categories, accounts, {
           balances: accountBalances(accounts, history),
           memory: aiMemory?.summary,
+          image: image ? { mimeType: image.mimeType, data: image.data } : undefined,
         }),
       ).map(resolveStatedBalance)
       const matched = result.filter((e) => e.statedBalance != null && e.account && e.totalAmount === 0)
@@ -89,9 +133,13 @@ export default function QuickEntry() {
       const fallback = withInferredAccounts(quickParse(input, categories))
       setEntries(fallback)
       if (e instanceof NoGeminiKeyError) {
-        if (fallback.length === 0) {
-          setNotice('Could not parse that. Add a Gemini key in Settings for smarter parsing.')
-        }
+        setNotice(
+          image
+            ? 'Reading screenshots needs a Gemini key — add one in Settings.'
+            : fallback.length === 0
+              ? 'Could not parse that. Add a Gemini key in Settings for smarter parsing.'
+              : null,
+        )
       } else if (e instanceof GeminiError) {
         setNotice(`${e.message}${fallback.length > 0 ? ' — used simple parsing instead.' : ''}`)
       } else {
@@ -166,6 +214,7 @@ export default function QuickEntry() {
     saveAll(txs)
     setEntries([])
     setText('')
+    clearImage()
     setNotice(`Saved ${txs.length} transaction${txs.length > 1 ? 's' : ''}.`)
     // Update the AI's memory of this user in the background
     void maybeRefreshAiMemory([...history, ...txs], categories, accounts).then((next) => {
@@ -188,11 +237,39 @@ export default function QuickEntry() {
             if (e.key === 'Enter') void parse()
           }}
         />
-        <Button onClick={() => void parse()} disabled={parsing || !text.trim()}>
+        <Button
+          variant="outline"
+          size="icon"
+          aria-label="Attach a payment screenshot"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <ImagePlus />
+        </Button>
+        <Button onClick={() => void parse()} disabled={parsing || (!text.trim() && !image)}>
           <Sparkles data-icon="inline-start" />
           {parsing ? 'Parsing…' : 'Add'}
         </Button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            if (f) attachImage(f)
+            e.target.value = ''
+          }}
+        />
       </div>
+      {image && (
+        <div className="flex items-center gap-2">
+          <img src={image.previewUrl} alt="Attached screenshot" className="h-12 w-12 rounded-lg object-cover ring-1 ring-border" />
+          <span className="text-xs text-muted-foreground">Screenshot attached</span>
+          <Button variant="ghost" size="icon-xs" onClick={clearImage} aria-label="Remove screenshot">
+            <X />
+          </Button>
+        </div>
+      )}
       {notice && <p className="text-xs text-muted-foreground">{notice}</p>}
       {entries.length > 0 && (
         <div className="space-y-2">

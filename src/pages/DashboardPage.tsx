@@ -8,10 +8,12 @@ import NetWorthHero from '../components/NetWorthHero'
 import QuickEntry from '../components/QuickEntry'
 import TransactionList from '../components/TransactionList'
 import TrendChart from '../components/TrendChart'
+import UpcomingBills from '../components/UpcomingBills'
 import { effectiveLimit, useAccounts, useBudgets, useCategories } from '../hooks/useData'
 import { useAllTransactions, useMonthsTransactions } from '../hooks/useTransactions'
 import { accountBalances } from '../lib/accounts'
-import { currentMonthKey, lastNMonthKeys, monthKey, monthLabel } from '../lib/dates'
+import { detectRecurring, upcomingInMonth } from '../lib/recurring'
+import { currentMonthKey, lastNMonthKeys, monthKey, monthLabel, todayISO } from '../lib/dates'
 import { formatINR } from '../lib/money'
 import { spentByCategory, totals } from '../lib/stats'
 
@@ -49,6 +51,15 @@ export default function DashboardPage() {
     .sort((a, b) => (a.date === b.date ? (a.createdAt < b.createdAt ? 1 : -1) : a.date < b.date ? 1 : -1))
     .slice(0, 10)
 
+  // Recurring items are always assessed against the real current month
+  const nowMonth = currentMonthKey()
+  const upcoming = upcomingInMonth(
+    detectRecurring(allTransactions),
+    allTransactions.filter((t) => monthKey(t.date) === nowMonth),
+    nowMonth,
+    todayISO(),
+  )
+
   const warnings = categories
     .filter((c) => c.type === 'expense')
     .map((c) => {
@@ -71,6 +82,8 @@ export default function DashboardPage() {
         thisMonthSpent={currentTotals.expense}
         accounts={accounts.map((a) => ({ id: a.id, name: a.name, balance: balances[a.id] ?? 0 }))}
       />
+
+      <UpcomingBills bills={upcoming} />
 
       {warnings.length > 0 && (
         <div className="space-y-1.5">
