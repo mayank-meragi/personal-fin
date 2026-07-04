@@ -23,8 +23,8 @@ const typeStyles: Record<TransactionType, string> = {
   transfer: 'bg-sky-50 text-sky-700',
 }
 
-const fieldClass =
-  'h-8 rounded-md border border-input bg-background px-2 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40'
+const chipClass =
+  'h-7 rounded-full border-0 bg-background px-2.5 text-xs font-medium text-foreground shadow-xs ring-1 ring-border outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50'
 
 export default function QuickEntry() {
   const { categories, addCategory } = useCategories()
@@ -278,111 +278,123 @@ export default function QuickEntry() {
       {entries.length > 0 && (
         <div className="space-y-2">
           {entries.map((entry, i) => (
-            <div key={i} className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2">
-              <button
-                type="button"
-                onClick={() => cycleType(i)}
-                className={cn('rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors', typeStyles[entry.type])}
-                title="Toggle expense/income/transfer"
-              >
-                {entry.type}
-              </button>
-              <input
-                className={cn(fieldClass, 'min-w-0 flex-1 basis-28')}
-                value={entry.description}
-                onChange={(e) => updateEntry(i, { description: e.target.value })}
-              />
-              <input
-                className={cn(fieldClass, 'w-24 text-right tabular-nums')}
-                type="number"
-                step="0.01"
-                min="0"
-                value={entry.totalAmount}
-                onChange={(e) => updateEntry(i, { totalAmount: Number(e.target.value) })}
-              />
-              {entry.type !== 'transfer' && (
-                <select
-                  className={cn(fieldClass, 'min-w-0 max-w-44')}
-                  value={entry.category}
-                  onChange={(e) => updateEntry(i, { category: e.target.value })}
-                >
-                  {!knownCategoryIds.has(entry.category) && (
-                    <option value={entry.category}>
-                      {entry.categoryEmoji ?? '🏷️'} {entry.categoryName ?? entry.category} (new)
-                    </option>
+            <div key={i} className="space-y-2.5 rounded-2xl bg-muted/40 p-3.5">
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => cycleType(i)}
+                  className={cn(
+                    'rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors',
+                    typeStyles[entry.type],
                   )}
-                  {categories
-                    .filter((c) => c.type === entry.type)
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.emoji} {c.name}
-                      </option>
-                    ))}
-                </select>
-              )}
-              {accounts.length > 0 && (
-                <select
-                  className={cn(fieldClass, 'min-w-0 max-w-40', !entry.account && 'border-red-300 text-red-600')}
-                  value={entry.account ?? ''}
-                  onChange={(e) => updateEntry(i, { account: e.target.value || undefined })}
+                  title="Toggle expense/income/transfer"
                 >
-                  <option value="">{entry.type === 'transfer' ? 'From account…' : 'Account…'}</option>
-                  {accounts.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {entry.type === 'transfer' && accounts.length > 0 && (
-                <>
-                  <span className="text-xs text-muted-foreground">→</span>
+                  {entry.type}
+                </button>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="text-muted-foreground hover:text-destructive"
+                  onClick={() => removeEntry(i)}
+                  aria-label="Remove entry"
+                >
+                  <X />
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <input
+                  className="min-w-0 flex-1 bg-transparent text-base font-medium text-foreground outline-none"
+                  value={entry.description}
+                  onChange={(e) => updateEntry(i, { description: e.target.value })}
+                />
+                <input
+                  className="w-24 shrink-0 bg-transparent text-right text-base font-semibold tabular-nums text-foreground outline-none"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={entry.totalAmount}
+                  onChange={(e) => updateEntry(i, { totalAmount: Number(e.target.value) })}
+                />
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                {entry.type !== 'transfer' && (
                   <select
-                    className={cn(
-                      fieldClass,
-                      'min-w-0 max-w-40',
-                      (!entry.toAccount || entry.toAccount === entry.account) && 'border-red-300 text-red-600',
-                    )}
-                    value={entry.toAccount ?? ''}
-                    onChange={(e) => updateEntry(i, { toAccount: e.target.value || undefined })}
+                    className={cn(chipClass, 'max-w-36')}
+                    value={entry.category}
+                    onChange={(e) => updateEntry(i, { category: e.target.value })}
                   >
-                    <option value="">To account…</option>
-                    {accounts
-                      .filter((a) => a.id !== entry.account)
-                      .map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.name}
+                    {!knownCategoryIds.has(entry.category) && (
+                      <option value={entry.category}>
+                        {entry.categoryEmoji ?? '🏷️'} {entry.categoryName ?? entry.category} (new)
+                      </option>
+                    )}
+                    {categories
+                      .filter((c) => c.type === entry.type)
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.emoji} {c.name}
                         </option>
                       ))}
                   </select>
-                </>
-              )}
-              <input
-                className={fieldClass}
-                type="date"
-                value={entry.date ?? todayISO()}
-                onChange={(e) => updateEntry(i, { date: e.target.value })}
-              />
+                )}
+                {accounts.length > 0 && (
+                  <select
+                    className={cn(chipClass, 'max-w-32', !entry.account && 'text-red-600 ring-red-300')}
+                    value={entry.account ?? ''}
+                    onChange={(e) => updateEntry(i, { account: e.target.value || undefined })}
+                  >
+                    <option value="">{entry.type === 'transfer' ? 'From…' : 'Account…'}</option>
+                    {accounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {entry.type === 'transfer' && accounts.length > 0 && (
+                  <>
+                    <span className="flex items-center text-xs text-muted-foreground">→</span>
+                    <select
+                      className={cn(
+                        chipClass,
+                        'max-w-32',
+                        (!entry.toAccount || entry.toAccount === entry.account) && 'text-red-600 ring-red-300',
+                      )}
+                      value={entry.toAccount ?? ''}
+                      onChange={(e) => updateEntry(i, { toAccount: e.target.value || undefined })}
+                    >
+                      <option value="">To…</option>
+                      {accounts
+                        .filter((a) => a.id !== entry.account)
+                        .map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.name}
+                          </option>
+                        ))}
+                    </select>
+                  </>
+                )}
+                <input
+                  className={chipClass}
+                  type="date"
+                  value={entry.date ?? todayISO()}
+                  onChange={(e) => updateEntry(i, { date: e.target.value })}
+                />
+              </div>
+
               {entry.quantity && entry.unitAmount ? (
-                <span className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   {entry.quantity} × {formatINRExact(entry.unitAmount)}
-                </span>
+                </p>
               ) : null}
               {entry.statedBalance != null && entry.account ? (
-                <span className="basis-full text-xs text-sky-700">
+                <p className="text-xs text-sky-700">
                   ↳ leaves {formatINRExact(entry.statedBalance)} in{' '}
                   {accounts.find((a) => a.id === entry.account)?.name ?? entry.account}
-                </span>
+                </p>
               ) : null}
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className="ml-auto text-muted-foreground hover:text-destructive"
-                onClick={() => removeEntry(i)}
-                aria-label="Remove entry"
-              >
-                <X />
-              </Button>
             </div>
           ))}
           <div className="flex items-center justify-end gap-2">
