@@ -224,6 +224,7 @@ export default function QuickEntry() {
 
   return (
     <Card className="gap-3 p-4">
+      <h2 className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Quick Add</h2>
       <div className="space-y-2">
         <Input
           className="border-transparent bg-transparent px-1 text-base shadow-none focus-visible:border-transparent focus-visible:ring-0"
