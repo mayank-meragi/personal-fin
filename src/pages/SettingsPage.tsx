@@ -91,26 +91,33 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="divide-y">
-            {accounts.map((acc) => (
-              <div key={acc.id} className="flex flex-wrap items-center gap-2 py-2">
-                <span className="text-lg">{accountTypeEmoji[acc.type]}</span>
-                <Input
-                  className="h-8 min-w-0 flex-1"
-                  value={acc.name}
-                  onChange={(e) => updateAccount(acc.id, { name: e.target.value })}
-                />
-                <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  start ₹
+            {accounts.map((acc) => {
+              const isCard = acc.type === 'credit-card'
+              return (
+                <div key={acc.id} className="flex flex-wrap items-center gap-2 py-2">
+                  <span className="text-lg">{accountTypeEmoji[acc.type]}</span>
                   <Input
-                    className="h-8 w-28 text-right tabular-nums"
-                    type="number"
-                    step="0.01"
-                    value={acc.startingBalance}
-                    onChange={(e) => updateAccount(acc.id, { startingBalance: Number(e.target.value) || 0 })}
+                    className="h-8 min-w-0 flex-1"
+                    value={acc.name}
+                    onChange={(e) => updateAccount(acc.id, { name: e.target.value })}
                   />
-                </label>
-              </div>
-            ))}
+                  <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    {isCard ? 'owes ₹' : 'start ₹'}
+                    <Input
+                      className="h-8 w-28 text-right tabular-nums"
+                      type="number"
+                      step="0.01"
+                      min={isCard ? '0' : undefined}
+                      value={isCard ? Math.abs(acc.startingBalance) : acc.startingBalance}
+                      onChange={(e) => {
+                        const v = Number(e.target.value) || 0
+                        updateAccount(acc.id, { startingBalance: isCard ? -Math.abs(v) : v })
+                      }}
+                    />
+                  </label>
+                </div>
+              )
+            })}
           </div>
           <div className="flex flex-wrap items-center gap-2 border-t pt-3">
             <Input
@@ -134,7 +141,8 @@ export default function SettingsPage() {
               className="h-8 w-28 text-right tabular-nums"
               type="number"
               step="0.01"
-              placeholder="balance ₹"
+              min={newType === 'credit-card' ? '0' : undefined}
+              placeholder={newType === 'credit-card' ? 'owe ₹' : 'balance ₹'}
               value={newBalance}
               onChange={(e) => setNewBalance(e.target.value)}
             />
@@ -144,12 +152,13 @@ export default function SettingsPage() {
               onClick={() => {
                 let id = makeAccountId(newName)
                 if (accounts.some((a) => a.id === id)) id = `${id}-${accounts.length + 1}`
+                const magnitude = Number(newBalance) || 0
                 addAccounts([
                   {
                     id,
                     name: newName.trim(),
                     type: newType,
-                    startingBalance: Number(newBalance) || 0,
+                    startingBalance: newType === 'credit-card' ? -Math.abs(magnitude) : magnitude,
                     createdAt: new Date().toISOString(),
                   },
                 ])

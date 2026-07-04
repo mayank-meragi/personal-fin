@@ -26,13 +26,16 @@ export default function AccountSetup() {
     if (!trimmed) return
     let id = makeAccountId(trimmed)
     if (drafts.some((d) => d.id === id)) id = `${id}-${drafts.length + 1}`
+    const magnitude = Number(balance) || 0
     setDrafts([
       ...drafts,
       {
         id,
         name: trimmed,
         type,
-        startingBalance: Number(balance) || 0,
+        // Credit cards: the field asks "what do you owe" (always positive) —
+        // store it as debt (negative) so net worth subtracts it correctly.
+        startingBalance: type === 'credit-card' ? -Math.abs(magnitude) : magnitude,
         createdAt: new Date().toISOString(),
       },
     ])
@@ -47,8 +50,8 @@ export default function AccountSetup() {
         <h1 className="text-2xl font-semibold tracking-tight">Add your accounts</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Every expense and income is tied to an account. Add each bank, credit card, or cash
-          stash you use, with what it holds right now. For a credit card, enter the amount you
-          currently owe as a negative number.
+          stash you use, with what it holds right now. For a credit card, just enter what you
+          currently owe — it's tracked as a debt automatically.
         </p>
       </div>
 
@@ -101,11 +104,14 @@ export default function AccountSetup() {
             ))}
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="acc-balance">Current balance (₹)</Label>
+            <Label htmlFor="acc-balance">
+              {type === 'credit-card' ? 'Amount you currently owe (₹)' : 'Current balance (₹)'}
+            </Label>
             <Input
               id="acc-balance"
               type="number"
               step="0.01"
+              min={type === 'credit-card' ? '0' : undefined}
               placeholder="0"
               value={balance}
               onChange={(e) => setBalance(e.target.value)}
