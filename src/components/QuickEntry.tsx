@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ImagePlus, Sparkles, X } from 'lucide-react'
+import {
+  AlertCircle,
+  ArrowLeftRight,
+  ImagePlus,
+  Sparkles,
+  Trash2,
+  TrendingDown,
+  TrendingUp,
+  X,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -9,22 +18,23 @@ import { fileQueryKey, useAccounts, useCategories, useFileQuery } from '../hooks
 import { makeTransaction, useAllTransactions, useTransactionMutations } from '../hooks/useTransactions'
 import { hasGeminiKey, parseWithGemini, GeminiError, NoGeminiKeyError } from '../lib/gemini'
 import { quickParse } from '../lib/quickParse'
-import { accountBalances, inferAccount } from '../lib/accounts'
+import { accountBalances, accountTypeEmoji, inferAccount } from '../lib/accounts'
 import { AI_MEMORY_PATH, emptyAiMemory, maybeRefreshAiMemory, type AiMemoryFile } from '../lib/aiMemory'
+import { categoryAvatarClass } from '../lib/categoryColor'
 import { todayISO } from '../lib/dates'
 import { formatINRExact } from '../lib/money'
 import type { ParsedEntry, TransactionType } from '../lib/types'
 
 const TYPE_CYCLE: TransactionType[] = ['expense', 'income', 'transfer']
 
-const typeStyles: Record<TransactionType, string> = {
-  expense: 'bg-secondary text-secondary-foreground',
-  income: 'bg-emerald-50 text-emerald-700',
-  transfer: 'bg-sky-50 text-sky-700',
+const typeChip: Record<TransactionType, { label: string; icon: typeof TrendingDown; className: string }> = {
+  expense: { label: 'Expense', icon: TrendingDown, className: 'bg-secondary text-secondary-foreground' },
+  income: { label: 'Income', icon: TrendingUp, className: 'bg-emerald-100 text-emerald-700' },
+  transfer: { label: 'Transfer', icon: ArrowLeftRight, className: 'bg-sky-100 text-sky-700' },
 }
 
 const chipClass =
-  'h-7 rounded-full border-0 bg-background px-2.5 text-xs font-medium text-foreground shadow-xs ring-1 ring-border outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50'
+  'h-7 rounded-full border-0 bg-background px-2 text-[11px] font-medium text-foreground shadow-xs ring-1 ring-border outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50'
 
 export default function QuickEntry() {
   const { categories, addCategory } = useCategories()
@@ -181,9 +191,11 @@ export default function QuickEntry() {
   }
 
   const knownCategoryIds = new Set(categories.map((c) => c.id))
-  const missingAccount =
-    accounts.length > 0 &&
-    entries.some((e) => !e.account || (e.type === 'transfer' && (!e.toAccount || e.toAccount === e.account)))
+  const missingAccountCount = accounts.length
+    ? entries.filter((e) => !e.account || (e.type === 'transfer' && (!e.toAccount || e.toAccount === e.account)))
+        .length
+    : 0
+  const missingAccount = missingAccountCount > 0
 
   function saveEntries() {
     // Create any categories the AI invented before saving transactions that use them
@@ -277,128 +289,165 @@ export default function QuickEntry() {
       {notice && <p className="text-xs text-muted-foreground">{notice}</p>}
       {entries.length > 0 && (
         <div className="space-y-2">
-          {entries.map((entry, i) => (
-            <div key={i} className="space-y-2.5 rounded-2xl bg-muted/40 p-3.5">
-              <div className="flex items-center justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={() => cycleType(i)}
-                  className={cn(
-                    'rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors',
-                    typeStyles[entry.type],
-                  )}
-                  title="Toggle expense/income/transfer"
-                >
-                  {entry.type}
-                </button>
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  className="text-muted-foreground hover:text-destructive"
-                  onClick={() => removeEntry(i)}
-                  aria-label="Remove entry"
-                >
-                  <X />
-                </Button>
-              </div>
+          {entries.map((entry, i) => {
+            const category = categories.find((c) => c.id === entry.category)
+            const avatarEmoji =
+              entry.type === 'transfer' ? '🔁' : (category?.emoji ?? entry.categoryEmoji ?? '🏷️')
+            const avatarClass = entry.type === 'transfer' ? 'bg-sky-100 text-sky-700' : categoryAvatarClass(entry.category)
+            const accountMissing = !entry.account
+            const toAccountMissing = entry.type === 'transfer' && (!entry.toAccount || entry.toAccount === entry.account)
+            const TypeIcon = typeChip[entry.type].icon
 
-              <div className="flex items-center gap-3">
-                <input
-                  className="min-w-0 flex-1 bg-transparent text-base font-medium text-foreground outline-none"
-                  value={entry.description}
-                  onChange={(e) => updateEntry(i, { description: e.target.value })}
-                />
-                <input
-                  className="w-24 shrink-0 bg-transparent text-right text-base font-semibold tabular-nums text-foreground outline-none"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={entry.totalAmount}
-                  onChange={(e) => updateEntry(i, { totalAmount: Number(e.target.value) })}
-                />
-              </div>
-
-              <div className="flex flex-wrap gap-1.5">
-                {entry.type !== 'transfer' && (
-                  <select
-                    className={cn(chipClass, 'max-w-36')}
-                    value={entry.category}
-                    onChange={(e) => updateEntry(i, { category: e.target.value })}
-                  >
-                    {!knownCategoryIds.has(entry.category) && (
-                      <option value={entry.category}>
-                        {entry.categoryEmoji ?? '🏷️'} {entry.categoryName ?? entry.category} (new)
-                      </option>
+            return (
+              <div key={i} className="space-y-2.5 rounded-2xl bg-muted/40 p-3.5">
+                <div className="flex items-center gap-3">
+                  <span
+                    className={cn(
+                      'flex size-10 shrink-0 items-center justify-center rounded-full text-lg',
+                      avatarClass,
                     )}
-                    {categories
-                      .filter((c) => c.type === entry.type)
-                      .map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.emoji} {c.name}
-                        </option>
-                      ))}
-                  </select>
-                )}
-                {accounts.length > 0 && (
-                  <select
-                    className={cn(chipClass, 'max-w-32', !entry.account && 'text-red-600 ring-red-300')}
-                    value={entry.account ?? ''}
-                    onChange={(e) => updateEntry(i, { account: e.target.value || undefined })}
+                    aria-hidden
                   >
-                    <option value="">{entry.type === 'transfer' ? 'From…' : 'Account…'}</option>
-                    {accounts.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {entry.type === 'transfer' && accounts.length > 0 && (
-                  <>
-                    <span className="flex items-center text-xs text-muted-foreground">→</span>
+                    {avatarEmoji}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <input
+                      className="w-full min-w-0 bg-transparent text-base font-medium text-foreground outline-none"
+                      value={entry.description}
+                      onChange={(e) => updateEntry(i, { description: e.target.value })}
+                    />
+                    {entry.quantity && entry.unitAmount ? (
+                      <p className="text-xs text-muted-foreground">
+                        {entry.quantity} × {formatINRExact(entry.unitAmount)}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex shrink-0 items-baseline gap-0.5">
+                    <span className="text-sm font-semibold text-muted-foreground">₹</span>
+                    <input
+                      className="w-16 bg-transparent text-right text-base font-semibold tabular-nums text-foreground outline-none"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={entry.totalAmount}
+                      onChange={(e) => updateEntry(i, { totalAmount: Number(e.target.value) })}
+                    />
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    className="shrink-0 text-muted-foreground hover:text-destructive"
+                    onClick={() => removeEntry(i)}
+                    aria-label="Remove entry"
+                  >
+                    <Trash2 />
+                  </Button>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => cycleType(i)}
+                    className={cn(
+                      'inline-flex h-7 items-center gap-1 rounded-full px-2 text-[11px] font-medium transition-colors',
+                      typeChip[entry.type].className,
+                    )}
+                    title="Toggle expense/income/transfer"
+                  >
+                    <TypeIcon className="size-3.5" />
+                    {typeChip[entry.type].label}
+                  </button>
+                  {entry.type !== 'transfer' && (
                     <select
-                      className={cn(
-                        chipClass,
-                        'max-w-32',
-                        (!entry.toAccount || entry.toAccount === entry.account) && 'text-red-600 ring-red-300',
-                      )}
-                      value={entry.toAccount ?? ''}
-                      onChange={(e) => updateEntry(i, { toAccount: e.target.value || undefined })}
+                      className={cn(chipClass, 'max-w-28')}
+                      value={entry.category}
+                      onChange={(e) => updateEntry(i, { category: e.target.value })}
                     >
-                      <option value="">To…</option>
-                      {accounts
-                        .filter((a) => a.id !== entry.account)
-                        .map((a) => (
-                          <option key={a.id} value={a.id}>
-                            {a.name}
+                      {!knownCategoryIds.has(entry.category) && (
+                        <option value={entry.category}>
+                          {entry.categoryEmoji ?? '🏷️'} {entry.categoryName ?? entry.category} (new)
+                        </option>
+                      )}
+                      {categories
+                        .filter((c) => c.type === entry.type)
+                        .map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.emoji} {c.name}
                           </option>
                         ))}
                     </select>
-                  </>
-                )}
-                <input
-                  className={chipClass}
-                  type="date"
-                  value={entry.date ?? todayISO()}
-                  onChange={(e) => updateEntry(i, { date: e.target.value })}
-                />
-              </div>
+                  )}
+                  {accounts.length > 0 && (
+                    <div className="relative">
+                      {accountMissing && (
+                        <AlertCircle className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-red-600" />
+                      )}
+                      <select
+                        className={cn(
+                          chipClass,
+                          'max-w-28',
+                          accountMissing && 'pl-7 text-red-600 ring-red-300',
+                        )}
+                        value={entry.account ?? ''}
+                        onChange={(e) => updateEntry(i, { account: e.target.value || undefined })}
+                      >
+                        <option value="">{entry.type === 'transfer' ? 'From…' : 'Account…'}</option>
+                        {accounts.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {accountTypeEmoji[a.type]} {a.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  {entry.type === 'transfer' && accounts.length > 0 && (
+                    <>
+                      <span className="flex items-center text-xs text-muted-foreground">→</span>
+                      <div className="relative">
+                        {toAccountMissing && (
+                          <AlertCircle className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-red-600" />
+                        )}
+                        <select
+                          className={cn(chipClass, 'max-w-28', toAccountMissing && 'pl-7 text-red-600 ring-red-300')}
+                          value={entry.toAccount ?? ''}
+                          onChange={(e) => updateEntry(i, { toAccount: e.target.value || undefined })}
+                        >
+                          <option value="">To…</option>
+                          {accounts
+                            .filter((a) => a.id !== entry.account)
+                            .map((a) => (
+                              <option key={a.id} value={a.id}>
+                                {accountTypeEmoji[a.type]} {a.name}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    </>
+                  )}
+                  <input
+                    className={chipClass}
+                    type="date"
+                    value={entry.date ?? todayISO()}
+                    onChange={(e) => updateEntry(i, { date: e.target.value })}
+                  />
+                </div>
 
-              {entry.quantity && entry.unitAmount ? (
-                <p className="text-xs text-muted-foreground">
-                  {entry.quantity} × {formatINRExact(entry.unitAmount)}
-                </p>
-              ) : null}
-              {entry.statedBalance != null && entry.account ? (
-                <p className="text-xs text-sky-700">
-                  ↳ leaves {formatINRExact(entry.statedBalance)} in{' '}
-                  {accounts.find((a) => a.id === entry.account)?.name ?? entry.account}
-                </p>
-              ) : null}
-            </div>
-          ))}
+                {entry.statedBalance != null && entry.account ? (
+                  <p className="text-xs text-sky-700">
+                    ↳ leaves {formatINRExact(entry.statedBalance)} in{' '}
+                    {accounts.find((a) => a.id === entry.account)?.name ?? entry.account}
+                  </p>
+                ) : null}
+              </div>
+            )
+          })}
+          {missingAccount && (
+            <p className="flex items-center gap-1.5 text-xs font-medium text-red-600">
+              <AlertCircle className="size-3.5" />
+              {missingAccountCount === 1 ? '1 item needs an account' : `${missingAccountCount} items need an account`}
+            </p>
+          )}
           <div className="flex items-center justify-end gap-2">
-            {missingAccount && <span className="text-xs text-red-600">Pick accounts for the highlighted items</span>}
             <Button variant="ghost" size="sm" onClick={() => setEntries([])}>
               Discard
             </Button>

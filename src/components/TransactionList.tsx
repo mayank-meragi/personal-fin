@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { Pencil, Trash2 } from 'lucide-react'
 import { useAccounts, useCategories } from '../hooks/useData'
+import { categoryAvatarClass } from '../lib/categoryColor'
 import { formatINRExact } from '../lib/money'
 import type { Transaction } from '../lib/types'
 
@@ -34,7 +35,10 @@ export default function TransactionList({ transactions, onEdit, onDelete }: Prop
         return (
           <div key={tx.id} className="group flex items-center gap-3 px-4 py-2.5">
             <span
-              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-base"
+              className={cn(
+                'flex size-9 shrink-0 items-center justify-center rounded-full text-base',
+                isTransfer ? 'bg-sky-100 text-sky-700' : categoryAvatarClass(tx.category),
+              )}
               title={isTransfer ? 'Transfer' : cat?.name}
             >
               {isTransfer ? '🔁' : (cat?.emoji ?? '📦')}
