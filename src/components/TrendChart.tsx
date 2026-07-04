@@ -27,6 +27,10 @@ export default function TrendChart({ byMonth, months }: Props) {
     return { month: monthLabel(m), income: t.income, expense: t.expense }
   })
 
+  if (data.every((d) => d.income === 0 && d.expense === 0)) {
+    return <p className="py-8 text-center text-sm text-muted-foreground">No activity yet.</p>
+  }
+
   return (
     <ResponsiveContainer width="100%" height={240}>
       <LineChart data={data} margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>

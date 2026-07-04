@@ -4,14 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import CategorySpendChart from '../components/CategorySpendChart'
 import MonthPicker from '../components/MonthPicker'
+import NetWorthHero from '../components/NetWorthHero'
 import QuickEntry from '../components/QuickEntry'
-import SummaryCards from '../components/SummaryCards'
 import TransactionList from '../components/TransactionList'
 import TrendChart from '../components/TrendChart'
 import { effectiveLimit, useAccounts, useBudgets, useCategories } from '../hooks/useData'
 import { useAllTransactions, useMonthsTransactions } from '../hooks/useTransactions'
-import { accountBalances, accountTypeEmoji } from '../lib/accounts'
-import { currentMonthKey, lastNMonthKeys } from '../lib/dates'
+import { accountBalances } from '../lib/accounts'
+import { currentMonthKey, lastNMonthKeys, monthKey, monthLabel } from '../lib/dates'
 import { formatINR } from '../lib/money'
 import { spentByCategory, totals } from '../lib/stats'
 
@@ -25,10 +25,26 @@ export default function DashboardPage() {
   const { transactions: allTransactions } = useAllTransactions()
 
   const current = byMonth[month] ?? []
-  const previous = byMonth[months[months.length - 2]] ?? []
   const spent = spentByCategory(current)
+  const currentTotals = totals(current)
 
   const balances = accountBalances(accounts, allTransactions)
+  const totalBalance = accounts.reduce((sum, acc) => sum + (balances[acc.id] ?? 0), 0)
+
+  // Cumulative net worth at each month end: walk back from today's total
+  const totalStarting = accounts.reduce((sum, acc) => sum + acc.startingBalance, 0)
+  const netByMonth = new Map<string, number>()
+  for (const tx of allTransactions) {
+    if (tx.type === 'transfer') continue
+    const m = monthKey(tx.date)
+    netByMonth.set(m, (netByMonth.get(m) ?? 0) + (tx.type === 'income' ? tx.amount : -tx.amount))
+  }
+  let running = totalStarting
+  const heroSeries = lastNMonthKeys(6).map((m) => {
+    running += netByMonth.get(m) ?? 0
+    return { label: monthLabel(m), value: running }
+  })
+
   const recent = [...allTransactions]
     .sort((a, b) => (a.date === b.date ? (a.createdAt < b.createdAt ? 1 : -1) : a.date < b.date ? 1 : -1))
     .slice(0, 10)
@@ -46,41 +62,15 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-4">
-        <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
-        <MonthPicker month={month} onChange={setMonth} />
-      </div>
-
       <QuickEntry />
 
-      <SummaryCards current={totals(current)} previousExpense={totals(previous).expense} />
-
-      {accounts.length > 0 && (
-        <div className="flex gap-3 overflow-x-auto pb-1">
-          <Card className="min-w-36 shrink-0 gap-1 border-primary bg-primary p-4 text-primary-foreground">
-            <p className="text-xs text-primary-foreground/70">Total balance</p>
-            <p className="text-lg font-semibold tabular-nums tracking-tight">
-              {formatINR(accounts.reduce((sum, acc) => sum + (balances[acc.id] ?? 0), 0))}
-            </p>
-          </Card>
-          {accounts.map((acc) => (
-            <Card key={acc.id} className="min-w-36 shrink-0 gap-1 p-4">
-              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span aria-hidden>{accountTypeEmoji[acc.type]}</span>
-                {acc.name}
-              </p>
-              <p
-                className={cn(
-                  'text-lg font-semibold tabular-nums tracking-tight',
-                  (balances[acc.id] ?? 0) < 0 && 'text-red-600',
-                )}
-              >
-                {formatINR(balances[acc.id] ?? 0)}
-              </p>
-            </Card>
-          ))}
-        </div>
-      )}
+      <NetWorthHero
+        totalBalance={totalBalance}
+        series={heroSeries}
+        thisMonthNet={currentTotals.net}
+        thisMonthSpent={currentTotals.expense}
+        accounts={accounts.map((a) => ({ id: a.id, name: a.name, balance: balances[a.id] ?? 0 }))}
+      />
 
       {warnings.length > 0 && (
         <div className="space-y-1.5">
@@ -89,10 +79,8 @@ export default function DashboardPage() {
               key={w.category.id}
               to="/budgets"
               className={cn(
-                'block rounded-lg border px-3 py-2 text-sm',
-                w.ratio > 1
-                  ? 'border-red-200 bg-red-50 text-red-800'
-                  : 'border-amber-200 bg-amber-50 text-amber-800',
+                'block rounded-2xl px-4 py-2.5 text-sm',
+                w.ratio > 1 ? 'bg-red-50 text-red-800 ring-1 ring-red-100' : 'bg-amber-50 text-amber-800 ring-1 ring-amber-100',
               )}
             >
               ⚠ {w.category.emoji} {w.category.name}: {formatINR(w.spent)} of {formatINR(w.limit)}{' '}
@@ -102,9 +90,16 @@ export default function DashboardPage() {
         </div>
       )}
 
+      <div className="flex items-center justify-between pt-1">
+        <h2 className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+          {monthLabel(month)} breakdown
+        </h2>
+        <MonthPicker month={month} onChange={setMonth} />
+      </div>
+
       <Card className="gap-3">
         <CardHeader>
-          <CardTitle className="text-sm font-medium">Spend by category</CardTitle>
+          <CardTitle className="text-sm font-semibold">Spend by category</CardTitle>
         </CardHeader>
         <CardContent>
           <CategorySpendChart transactions={current} />
@@ -113,7 +108,7 @@ export default function DashboardPage() {
 
       <Card className="gap-3">
         <CardHeader>
-          <CardTitle className="text-sm font-medium">Income vs expense — last 6 months</CardTitle>
+          <CardTitle className="text-sm font-semibold">Income vs expense</CardTitle>
         </CardHeader>
         <CardContent>
           <TrendChart byMonth={byMonth} months={months} />
@@ -122,8 +117,10 @@ export default function DashboardPage() {
 
       <div>
         <div className="mb-2 flex items-baseline justify-between">
-          <h2 className="text-sm font-medium text-muted-foreground">Recent transactions</h2>
-          <Link to="/transactions" className="text-xs text-primary underline-offset-4 hover:underline">
+          <h2 className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+            Recent transactions
+          </h2>
+          <Link to="/transactions" className="text-xs font-medium text-primary underline-offset-4 hover:underline">
             view all
           </Link>
         </div>
