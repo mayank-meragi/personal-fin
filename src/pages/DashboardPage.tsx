@@ -16,7 +16,7 @@ import { getConfig } from '../lib/cache'
 import { detectRecurring, upcomingInMonth } from '../lib/recurring'
 import { currentMonthKey, lastNMonthKeys, monthKey, monthLabel, todayISO } from '../lib/dates'
 import { formatINR } from '../lib/money'
-import { spentByCategory, totals } from '../lib/stats'
+import { spentByCategory, splitSpendingSavings, totals } from '../lib/stats'
 
 /** First name from the data repo's GitHub owner, e.g. "mayank-meragi" → "Mayank" */
 function ownerFirstName(): string | null {
@@ -59,6 +59,8 @@ export default function DashboardPage() {
   const current = byMonth[month] ?? []
   const spent = spentByCategory(current)
   const currentTotals = totals(current)
+  const savingsIds = new Set(categories.filter((c) => c.savings).map((c) => c.id))
+  const { spending, savings } = splitSpendingSavings(current, savingsIds)
 
   const balances = accountBalances(accounts, allTransactions)
   const totalBalance = accounts.reduce((sum, acc) => sum + (balances[acc.id] ?? 0), 0)
@@ -109,7 +111,8 @@ export default function DashboardPage() {
         totalBalance={totalBalance}
         series={heroSeries}
         thisMonthNet={currentTotals.net}
-        thisMonthSpent={currentTotals.expense}
+        thisMonthSpent={spending}
+        thisMonthSaved={savings}
         accounts={accounts.map((a) => ({ id: a.id, name: a.name, balance: balances[a.id] ?? 0 }))}
       />
 

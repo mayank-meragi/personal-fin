@@ -63,6 +63,7 @@ export const defaultCategories: CategoriesFile = {
       name: 'Investments',
       emoji: '📈',
       type: 'expense',
+      savings: true,
       hints: ['invest', 'stocks', 'shares', 'zerodha', 'groww', 'etf', 'gold', 'fd', 'nps', 'ppf'],
     },
     {
@@ -71,6 +72,7 @@ export const defaultCategories: CategoriesFile = {
       emoji: '📊',
       type: 'expense',
       parent: 'investments',
+      savings: true,
       hints: ['mutual fund', 'sip', 'elss', 'nav', 'folio'],
     },
     {

@@ -26,3 +26,21 @@ export function spentByCategory(txs: Transaction[]): Record<string, number> {
   }
   return out
 }
+
+/**
+ * Split expense outflow into true spending vs savings (money that builds
+ * wealth — mutual funds, FDs — leaves the account but isn't consumed).
+ */
+export function splitSpendingSavings(
+  txs: Transaction[],
+  savingsCategoryIds: Set<string>,
+): { spending: number; savings: number } {
+  let spending = 0
+  let savings = 0
+  for (const t of txs) {
+    if (t.type !== 'expense') continue
+    if (savingsCategoryIds.has(t.category)) savings += t.amount
+    else spending += t.amount
+  }
+  return { spending, savings }
+}

@@ -39,7 +39,8 @@ function accountLine(a: Account, balances?: Record<string, number>): string {
 
 function categoryLine(c: Category): string {
   const sub = c.parent ? `, sub of ${c.parent}` : ''
-  return `- ${c.id} — ${c.name} (${c.type}${sub})${c.hints.length ? ` — e.g. ${c.hints.slice(0, 6).join(', ')}` : ''}`
+  const savings = c.savings ? ', savings' : ''
+  return `- ${c.id} — ${c.name} (${c.type}${sub}${savings})${c.hints.length ? ` — e.g. ${c.hints.slice(0, 6).join(', ')}` : ''}`
 }
 
 function buildSystemPrompt(categories: Category[], accounts: Account[], context: ParseContext): string {
@@ -341,7 +342,9 @@ ${existing.map(categoryLine).join('\n')}
 
 Return: id (short kebab-case, new), name (Title Case), emoji (one fitting emoji), type
 ("expense" or "income"), hints (5-10 lowercase keywords/merchants an Indian user would write
-that should classify into this category), parent (existing id, or omit).`
+that should classify into this category), parent (existing id, or omit), savings (true only
+when the money builds wealth rather than being consumed — investments, mutual funds, FDs,
+RDs, gold; false for normal spending).`
 
   const text = await callGemini({
     contents: [{ parts: [{ text: prompt }] }],
@@ -358,6 +361,7 @@ that should classify into this category), parent (existing id, or omit).`
           type: { type: 'STRING', enum: ['expense', 'income'] },
           hints: { type: 'ARRAY', items: { type: 'STRING' } },
           parent: { type: 'STRING' },
+          savings: { type: 'BOOLEAN' },
         },
         required: ['id', 'name', 'emoji', 'type', 'hints'],
       },
@@ -378,13 +382,15 @@ that should classify into this category), parent (existing id, or omit).`
     raw.parent && existingIds.has(raw.parent) ? existing.find((c) => c.id === raw.parent) : undefined
   // Only one level of nesting; a subcategory always shares its parent's type
   const parent = parentCategory && !parentCategory.parent ? parentCategory : undefined
+  const type = parent ? parent.type : raw.type === 'income' ? 'income' : 'expense'
   return {
     id,
     name: raw.name?.trim() || titleCase(id),
     emoji: raw.emoji?.trim() || '🏷️',
-    type: parent ? parent.type : raw.type === 'income' ? 'income' : 'expense',
+    type,
     hints: Array.isArray(raw.hints) ? raw.hints.filter((h) => typeof h === 'string' && h).slice(0, 12) : [],
     parent: parent?.id,
+    savings: type === 'expense' ? Boolean(parent?.savings || raw.savings) || undefined : undefined,
   }
 }
 

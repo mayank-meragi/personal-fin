@@ -9,14 +9,23 @@ interface Props {
   series: { label: string; value: number }[]
   thisMonthNet: number
   thisMonthSpent: number
+  thisMonthSaved?: number
   accounts: { id: string; name: string; balance: number }[]
 }
 
-export default function NetWorthHero({ totalBalance, series, thisMonthNet, thisMonthSpent, accounts }: Props) {
+export default function NetWorthHero({
+  totalBalance,
+  series,
+  thisMonthNet,
+  thisMonthSpent,
+  thisMonthSaved = 0,
+  accounts,
+}: Props) {
   const up = thisMonthNet >= 0
 
   const stats: { label: string; value: number; tone?: string }[] = [
     { label: 'Spent', value: thisMonthSpent },
+    ...(thisMonthSaved > 0 ? [{ label: 'Saved', value: thisMonthSaved, tone: 'var(--money-in)' }] : []),
     ...accounts.map((a) => ({
       label: a.name,
       value: a.balance,

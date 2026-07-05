@@ -47,6 +47,8 @@ export interface Category {
   hints: string[]
   /** Parent category id — makes this a subcategory (one level deep) */
   parent?: string
+  /** Money out that builds wealth (mutual funds, FD…) — reported as saved, not spent */
+  savings?: boolean
 }
 
 export interface CategoriesFile {

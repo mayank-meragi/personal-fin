@@ -33,7 +33,15 @@ export function useCategories() {
     queryClient.setQueryData(fileQueryKey('categories.json'), next)
   }
 
-  return { categories: (data ?? defaultCategories).categories, addCategory }
+  function updateCategory(id: string, patch: Partial<Pick<Category, 'name' | 'emoji' | 'hints' | 'savings'>>) {
+    const next = updateFile<CategoriesFile>('categories.json', defaultCategories, (current) => ({
+      ...current,
+      categories: current.categories.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+    }))
+    queryClient.setQueryData(fileQueryKey('categories.json'), next)
+  }
+
+  return { categories: (data ?? defaultCategories).categories, addCategory, updateCategory }
 }
 
 const emptyAccounts: AccountsFile = { accounts: [] }
