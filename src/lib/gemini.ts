@@ -327,71 +327,92 @@ ${txLines || '(none)'}`
 }
 
 /**
- * Turn a free-text description ("vices - cigarettes and alcohol") into a
- * complete Category for the user to add: id, name, emoji, classifier hints,
- * and an optional parent when it belongs under an existing category.
+ * Turn a free-text instruction into one or MANY categories to add. Handles
+ * "vices - cigarettes and alcohol" (one category) as well as batch commands
+ * like "add all the food apps under food & drinks: swiggy, zomato, ownly" —
+ * one subcategory per app. A parent may be an existing category or another
+ * category created earlier in the same batch.
  */
-export async function generateCategory(description: string, existing: Category[]): Promise<Category> {
-  const prompt = `Create ONE spending/income category for a personal finance app from this
-description: "${description}"
+export async function generateCategories(instruction: string, existing: Category[]): Promise<Category[]> {
+  const prompt = `You manage the category tree of a personal finance app. Execute this
+instruction from the user by returning the NEW categories to create (one or many):
+"${instruction}"
 
-Existing categories (do not duplicate an id; if the new one naturally belongs UNDER one of
-these, set parent to that id — only one level of nesting is allowed, so a category that is
-itself a sub-category cannot be a parent):
+Existing categories (never duplicate an id):
 ${existing.map(categoryLine).join('\n')}
 
-Return: id (short kebab-case, new), name (Title Case), emoji (one fitting emoji), type
-("expense" or "income"), hints (5-10 lowercase keywords/merchants an Indian user would write
-that should classify into this category), parent (existing id, or omit), savings (true only
-when the money builds wealth rather than being consumed — investments, mutual funds, FDs,
-RDs, gold; false for normal spending).`
+Rules:
+- The user may ask for one category or a whole batch ("add all the food apps under food &
+  drinks: swiggy, zomato…" → one subcategory per named app, parent food-drink, each with
+  that app/merchant as its hints).
+- parent must be an existing top-level id, or the id of another category in YOUR response.
+  Only one level of nesting: a subcategory can never be a parent.
+- Order parents before their children in the response.
+- Each category: id (short kebab-case, new), name (Title Case), emoji (one fitting emoji),
+  type ("expense" or "income" — subcategories inherit the parent's type), hints (3-10
+  lowercase keywords/merchants an Indian user would write that classify into it), savings
+  (true only when the money builds wealth — investments, mutual funds, FDs, gold).
+- Create only what the instruction asks for. No filler.`
 
   const text = await callGemini({
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: {
       temperature: 0,
-      maxOutputTokens: 512,
+      maxOutputTokens: 2048,
       response_mime_type: 'application/json',
       response_schema: {
-        type: 'OBJECT',
-        properties: {
-          id: { type: 'STRING' },
-          name: { type: 'STRING' },
-          emoji: { type: 'STRING' },
-          type: { type: 'STRING', enum: ['expense', 'income'] },
-          hints: { type: 'ARRAY', items: { type: 'STRING' } },
-          parent: { type: 'STRING' },
-          savings: { type: 'BOOLEAN' },
+        type: 'ARRAY',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            id: { type: 'STRING' },
+            name: { type: 'STRING' },
+            emoji: { type: 'STRING' },
+            type: { type: 'STRING', enum: ['expense', 'income'] },
+            hints: { type: 'ARRAY', items: { type: 'STRING' } },
+            parent: { type: 'STRING' },
+            savings: { type: 'BOOLEAN' },
+          },
+          required: ['id', 'name', 'emoji', 'type', 'hints'],
         },
-        required: ['id', 'name', 'emoji', 'type', 'hints'],
       },
     },
   })
 
-  let raw: Partial<Category>
+  let raw: Partial<Category>[]
   try {
-    raw = JSON.parse(text) as Partial<Category>
+    const parsed = JSON.parse(text)
+    if (!Array.isArray(parsed)) throw new Error('not an array')
+    raw = parsed as Partial<Category>[]
   } catch {
-    throw new GeminiError('Gemini returned an invalid category')
+    throw new GeminiError('Gemini returned invalid categories')
   }
-  const existingIds = new Set(existing.map((c) => c.id))
-  let id = toKebabId(raw.id || raw.name || description)
-  if (!id) throw new GeminiError('Gemini returned an invalid category')
-  while (existingIds.has(id)) id = `${id}-2`
-  const parentCategory =
-    raw.parent && existingIds.has(raw.parent) ? existing.find((c) => c.id === raw.parent) : undefined
-  // Only one level of nesting; a subcategory always shares its parent's type
-  const parent = parentCategory && !parentCategory.parent ? parentCategory : undefined
-  const type = parent ? parent.type : raw.type === 'income' ? 'income' : 'expense'
-  return {
-    id,
-    name: raw.name?.trim() || titleCase(id),
-    emoji: raw.emoji?.trim() || '🏷️',
-    type,
-    hints: Array.isArray(raw.hints) ? raw.hints.filter((h) => typeof h === 'string' && h).slice(0, 12) : [],
-    parent: parent?.id,
-    savings: type === 'expense' ? Boolean(parent?.savings || raw.savings) || undefined : undefined,
+
+  // Validate incrementally so a batch item can parent later items
+  const known = new Map(existing.map((c) => [c.id, c]))
+  const result: Category[] = []
+  for (const item of raw) {
+    let id = toKebabId(item.id || item.name || '')
+    if (!id) continue
+    while (known.has(id)) id = `${id}-2`
+    const parentCategory = item.parent ? known.get(item.parent) : undefined
+    // Only one level of nesting; a subcategory always shares its parent's type
+    const parent = parentCategory && !parentCategory.parent ? parentCategory : undefined
+    const type = parent ? parent.type : item.type === 'income' ? 'income' : 'expense'
+    const category: Category = {
+      id,
+      name: item.name?.trim() || titleCase(id),
+      emoji: item.emoji?.trim() || '🏷️',
+      type,
+      hints: Array.isArray(item.hints) ? item.hints.filter((h) => typeof h === 'string' && h).slice(0, 12) : [],
+      parent: parent?.id,
+      savings: type === 'expense' ? Boolean(parent?.savings || item.savings) || undefined : undefined,
+    }
+    known.set(id, category)
+    result.push(category)
   }
+  if (result.length === 0) throw new GeminiError('Gemini returned no usable categories')
+  return result
 }
 
 const CHUNK_SIZE = 50

@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronLeft, PiggyBank, Sparkles } from 'lucide-react'
+import { ChevronLeft, PiggyBank, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useCategories } from '../hooks/useData'
 import { groupedCategories } from '../lib/categories'
 import { categoryColor, categoryIcon } from '../lib/categoryIcon'
-import { generateCategory, GeminiError, hasGeminiKey, NoGeminiKeyError } from '../lib/gemini'
+import { generateCategories, GeminiError, hasGeminiKey, NoGeminiKeyError } from '../lib/gemini'
 import type { Category } from '../lib/types'
 
 /** Toggle chip for a category's spending/savings nature */
@@ -22,23 +22,36 @@ export default function CategoriesPage() {
   const [catDesc, setCatDesc] = useState('')
   const [catBusy, setCatBusy] = useState(false)
   const [catError, setCatError] = useState<string | null>(null)
-  const [catPreview, setCatPreview] = useState<Category | null>(null)
+  const [catPreview, setCatPreview] = useState<Category[] | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
-  async function suggestCategory() {
+  async function suggestCategories() {
     const desc = catDesc.trim()
     if (!desc || catBusy) return
     setCatBusy(true)
     setCatError(null)
     setCatPreview(null)
     try {
-      setCatPreview(await generateCategory(desc, categories))
+      setCatPreview(await generateCategories(desc, categories))
     } catch (e) {
       if (e instanceof NoGeminiKeyError) setCatError('Add a Gemini key in Settings to create categories with AI.')
-      else setCatError(e instanceof GeminiError ? e.message : 'Could not create a category from that.')
+      else setCatError(e instanceof GeminiError ? e.message : 'Could not create categories from that.')
     } finally {
       setCatBusy(false)
     }
+  }
+
+  function previewLabel(c: Category, batch: Category[]): string {
+    const parent = categories.find((p) => p.id === c.parent) ?? batch.find((p) => p.id === c.parent)
+    return parent ? `${parent.name} › ${c.name}` : c.name
+  }
+
+  function addAll(batch: Category[]) {
+    for (const c of batch) addCategory(c)
+    setCatPreview(null)
+    setCatDesc('')
+    setNotice(`Added ${batch.length} categor${batch.length === 1 ? 'y' : 'ies'}.`)
+    setTimeout(() => setNotice(null), 2500)
   }
 
   return (
@@ -57,18 +70,18 @@ export default function CategoriesPage() {
           <div className="flex gap-2">
             <Input
               className="h-9 min-w-0 flex-1"
-              placeholder='Describe one — "vices: cigarettes, alcohol"…'
+              placeholder='"add swiggy, zomato, ownly under food & drinks"…'
               value={catDesc}
               onChange={(e) => setCatDesc(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') void suggestCategory()
+                if (e.key === 'Enter') void suggestCategories()
               }}
             />
             <Button
               size="sm"
               className="h-9"
               disabled={catBusy || !catDesc.trim() || !hasGeminiKey()}
-              onClick={() => void suggestCategory()}
+              onClick={() => void suggestCategories()}
             >
               <Sparkles data-icon="inline-start" />
               {catBusy ? 'Thinking…' : 'Create with AI'}
@@ -76,35 +89,43 @@ export default function CategoriesPage() {
           </div>
           {catError && <p className="text-xs text-[var(--negative-600)]">{catError}</p>}
           {notice && <p className="text-xs text-[var(--positive-600)]">{notice}</p>}
-          {catPreview && (
-            <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-[var(--surface-sunken)] p-3">
-              <span className="text-lg">{catPreview.emoji}</span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-[var(--text-strong)]">
-                  {catPreview.parent
-                    ? `${categories.find((c) => c.id === catPreview.parent)?.name} › ${catPreview.name}`
-                    : catPreview.name}{' '}
-                  <span className="font-normal text-muted-foreground">
-                    ({catPreview.savings ? 'savings' : catPreview.type})
-                  </span>
-                </p>
-                <p className="truncate text-xs text-muted-foreground">matches: {catPreview.hints.join(', ')}</p>
+          {catPreview && catPreview.length > 0 && (
+            <div className="space-y-2">
+              {catPreview.map((c) => (
+                <div key={c.id} className="flex flex-wrap items-center gap-2 rounded-2xl bg-[var(--surface-sunken)] p-3">
+                  <span className="text-lg">{c.emoji}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-[var(--text-strong)]">
+                      {previewLabel(c, catPreview)}{' '}
+                      <span className="font-normal text-muted-foreground">({c.savings ? 'savings' : c.type})</span>
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">matches: {c.hints.join(', ')}</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    className="text-muted-foreground hover:text-destructive"
+                    aria-label={`Remove ${c.name}`}
+                    onClick={() =>
+                      setCatPreview((prev) => {
+                        // Dropping a parent also drops its children in the batch
+                        const next = (prev ?? []).filter((x) => x.id !== c.id && x.parent !== c.id)
+                        return next.length > 0 ? next : null
+                      })
+                    }
+                  >
+                    <X />
+                  </Button>
+                </div>
+              ))}
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setCatPreview(null)}>
+                  Discard all
+                </Button>
+                <Button size="sm" onClick={() => addAll(catPreview)}>
+                  Add all ({catPreview.length})
+                </Button>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => setCatPreview(null)}>
-                Discard
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => {
-                  addCategory(catPreview)
-                  setCatPreview(null)
-                  setCatDesc('')
-                  setNotice(`Category "${catPreview.name}" added.`)
-                  setTimeout(() => setNotice(null), 2500)
-                }}
-              >
-                Add
-              </Button>
             </div>
           )}
         </CardContent>
