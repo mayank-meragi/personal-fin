@@ -5,6 +5,7 @@ import { Download, LayoutDashboard, ReceiptText, Settings, Target } from 'lucide
 import DashboardPage from './pages/DashboardPage'
 import TransactionsPage from './pages/TransactionsPage'
 import BudgetsPage from './pages/BudgetsPage'
+import CategoriesPage from './pages/CategoriesPage'
 import ImportPage from './pages/ImportPage'
 import SettingsPage from './pages/SettingsPage'
 import Onboarding from './components/Onboarding'
@@ -94,6 +95,7 @@ export default function App() {
             <Route path="/budgets" element={<BudgetsPage />} />
             <Route path="/import" element={<ImportPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/categories" element={<CategoriesPage />} />
           </Routes>
         </main>
         <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-20 px-8 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] md:hidden">
