@@ -1,7 +1,9 @@
 import {
   ArrowLeftRight,
+  BarChart3,
   Briefcase,
   Car,
+  Cigarette,
   Clapperboard,
   Fuel,
   Gift,
@@ -14,6 +16,8 @@ import {
   PiggyBank,
   Plane,
   Receipt,
+  Repeat,
+  Scissors,
   Shield,
   ShoppingBag,
   ShoppingCart,
@@ -37,6 +41,13 @@ const BY_ID: Record<string, LucideIcon> = {
   shopping: ShoppingBag,
   health: HeartPulse,
   entertainment: Clapperboard,
+  vices: Cigarette,
+  investments: TrendingUp,
+  'mutual-funds': BarChart3,
+  travel: Plane,
+  subscriptions: Repeat,
+  education: GraduationCap,
+  'personal-care': Scissors,
   salary: Briefcase,
   'other-income': PiggyBank,
   other: Tag,
@@ -54,6 +65,9 @@ const KEYWORD_ICONS: [RegExp, LucideIcon][] = [
   [/phone|mobile|internet|broadband/, Smartphone],
   [/invest|mutual fund|stock|sip\b/, TrendingUp],
   [/interest|dividend|cashback|discount/, Percent],
+  [/smoke|cigarette|sutta|alcohol|beer|wine|vape/, Cigarette],
+  [/subscri|membership/, Repeat],
+  [/salon|haircut|grooming|spa/, Scissors],
 ]
 
 /** Line icon for a category, per Perfin's icon house rule. */

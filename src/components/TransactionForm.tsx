@@ -12,12 +12,15 @@ import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { useAccounts, useCategories } from '../hooks/useData'
+import { groupedCategories } from '../lib/categories'
 import { makeTransaction } from '../hooks/useTransactions'
 import { todayISO } from '../lib/dates'
 import type { Transaction, TransactionType } from '../lib/types'
@@ -127,11 +130,26 @@ export default function TransactionForm({ initial, onSave, onClose }: Props) {
                   <SelectValue placeholder="Pick a category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {typeCategories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.emoji} {c.name}
-                    </SelectItem>
-                  ))}
+                  {groupedCategories(categories, type === 'income' ? 'income' : 'expense').map(
+                    ({ parent, children }) =>
+                      children.length > 0 ? (
+                        <SelectGroup key={parent.id}>
+                          <SelectLabel>{parent.name}</SelectLabel>
+                          <SelectItem value={parent.id}>
+                            {parent.emoji} {parent.name}
+                          </SelectItem>
+                          {children.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.emoji} {c.name}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      ) : (
+                        <SelectItem key={parent.id} value={parent.id}>
+                          {parent.emoji} {parent.name}
+                        </SelectItem>
+                      ),
+                  )}
                 </SelectContent>
               </Select>
             </div>

@@ -1,5 +1,6 @@
 import { Card } from '@/components/ui/card'
 import { Amount } from './Amount'
+import { categoryDisplayName } from '../lib/categories'
 import { categoryColor, categoryIcon } from '../lib/categoryIcon'
 import { formatINR } from '../lib/money'
 import { spentByCategory } from '../lib/stats'
@@ -52,7 +53,9 @@ export default function CategoryBreakdownList({ transactions, categories, period
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="mb-1.5 flex items-baseline justify-between gap-2">
-                    <span className="truncate text-sm font-medium text-[var(--text-body)]">{category.name}</span>
+                    <span className="truncate text-sm font-medium text-[var(--text-body)]">
+                      {categoryDisplayName(category, categories)}
+                    </span>
                     <Amount value={amount} direction="neutral" signed={false} size="sm" weight="semibold" />
                   </div>
                   <div className="h-1.5 rounded-[var(--radius-pill)]" style={{ background: 'var(--ink-100)' }}>

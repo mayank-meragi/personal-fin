@@ -3,13 +3,17 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Sparkles } from 'lucide-react'
 import { clearFileCache, getConfig, setConfig } from '../lib/cache'
 import { flush, resetAllData } from '../lib/sync'
 import { useSyncState } from '../hooks/useSyncState'
-import { makeAccountId, useAccounts, useFileQuery } from '../hooks/useData'
+import { makeAccountId, useAccounts, useCategories, useFileQuery } from '../hooks/useData'
 import { accountTypeEmoji, accountTypeLabel } from '../lib/accounts'
 import { AI_MEMORY_PATH, emptyAiMemory, type AiMemoryFile } from '../lib/aiMemory'
-import type { AccountType } from '../lib/types'
+import { categoryDisplayName } from '../lib/categories'
+import { categoryColor, categoryIcon } from '../lib/categoryIcon'
+import { generateCategory, GeminiError, hasGeminiKey, NoGeminiKeyError } from '../lib/gemini'
+import type { AccountType, Category } from '../lib/types'
 
 export default function SettingsPage() {
   const queryClient = useQueryClient()
@@ -22,6 +26,27 @@ export default function SettingsPage() {
   const [newBalance, setNewBalance] = useState('')
   const [resetting, setResetting] = useState(false)
   const { data: aiMemory } = useFileQuery<AiMemoryFile>(AI_MEMORY_PATH, emptyAiMemory)
+  const { categories, addCategory } = useCategories()
+  const [catDesc, setCatDesc] = useState('')
+  const [catBusy, setCatBusy] = useState(false)
+  const [catError, setCatError] = useState<string | null>(null)
+  const [catPreview, setCatPreview] = useState<Category | null>(null)
+
+  async function suggestCategory() {
+    const desc = catDesc.trim()
+    if (!desc || catBusy) return
+    setCatBusy(true)
+    setCatError(null)
+    setCatPreview(null)
+    try {
+      setCatPreview(await generateCategory(desc, categories))
+    } catch (e) {
+      if (e instanceof NoGeminiKeyError) setCatError('Add a Gemini key below to create categories with AI.')
+      else setCatError(e instanceof GeminiError ? e.message : 'Could not create a category from that.')
+    } finally {
+      setCatBusy(false)
+    }
+  }
 
   const repo = getConfig('dataRepo')
   const branch = getConfig('dataBranch') ?? 'main'
@@ -170,6 +195,79 @@ export default function SettingsPage() {
               Add
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Categories</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap gap-1.5">
+            {categories.map((c) => {
+              const color = categoryColor(c.id)
+              const Icon = categoryIcon(c)
+              return (
+                <span
+                  key={c.id}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface-sunken)] py-1 pr-2.5 pl-1 text-xs font-medium"
+                  title={c.hints.join(', ')}
+                >
+                  <span
+                    className="flex size-5 items-center justify-center rounded-full"
+                    style={{ background: `color-mix(in oklch, ${color} 16%, white)`, color }}
+                  >
+                    <Icon className="size-3" strokeWidth={2} />
+                  </span>
+                  {categoryDisplayName(c, categories)}
+                </span>
+              )
+            })}
+          </div>
+          <div className="flex gap-2 border-t pt-3">
+            <Input
+              className="h-9 min-w-0 flex-1"
+              placeholder='Describe one — "vices: cigarettes, alcohol"…'
+              value={catDesc}
+              onChange={(e) => setCatDesc(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void suggestCategory()
+              }}
+            />
+            <Button size="sm" className="h-9" disabled={catBusy || !catDesc.trim() || !hasGeminiKey()} onClick={() => void suggestCategory()}>
+              <Sparkles data-icon="inline-start" />
+              {catBusy ? 'Thinking…' : 'Create with AI'}
+            </Button>
+          </div>
+          {catError && <p className="text-xs text-[var(--negative-600)]">{catError}</p>}
+          {catPreview && (
+            <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-[var(--surface-sunken)] p-3">
+              <span className="text-lg">{catPreview.emoji}</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-[var(--text-strong)]">
+                  {catPreview.parent
+                    ? `${categories.find((c) => c.id === catPreview.parent)?.name} › ${catPreview.name}`
+                    : catPreview.name}{' '}
+                  <span className="font-normal text-muted-foreground">({catPreview.type})</span>
+                </p>
+                <p className="truncate text-xs text-muted-foreground">matches: {catPreview.hints.join(', ')}</p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setCatPreview(null)}>
+                Discard
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  addCategory(catPreview)
+                  setCatPreview(null)
+                  setCatDesc('')
+                  note(`Category "${catPreview.name}" added.`)
+                }}
+              >
+                Add
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

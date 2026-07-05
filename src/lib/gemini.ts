@@ -37,10 +37,13 @@ function accountLine(a: Account, balances?: Record<string, number>): string {
   return `- ${a.id} — ${a.name} (${a.type})${balance}`
 }
 
+function categoryLine(c: Category): string {
+  const sub = c.parent ? `, sub of ${c.parent}` : ''
+  return `- ${c.id} — ${c.name} (${c.type}${sub})${c.hints.length ? ` — e.g. ${c.hints.slice(0, 6).join(', ')}` : ''}`
+}
+
 function buildSystemPrompt(categories: Category[], accounts: Account[], context: ParseContext): string {
-  const categoryLines = categories
-    .map((c) => `- ${c.id} — ${c.name} (${c.type})${c.hints.length ? ` — e.g. ${c.hints.slice(0, 6).join(', ')}` : ''}`)
-    .join('\n')
+  const categoryLines = categories.map(categoryLine).join('\n')
   const accountLines = accounts.map((a) => accountLine(a, context.balances)).join('\n')
   return `You parse informal Indian-English expense notes into transactions. Amounts are INR.
 Today is ${todayISO()} (IST). Rules:
@@ -66,7 +69,8 @@ Today is ${todayISO()} (IST). Rules:
 ${categoryLines}
 - If nothing in the list genuinely fits, invent a new category: set category to a short new
   kebab-case id, and also set categoryName (Title Case display name) and categoryEmoji
-  (one fitting emoji). Do this sparingly — most everyday items fit an existing category.
+  (one fitting emoji). If it naturally belongs under an existing category, set categoryParent
+  to that existing id. Do this sparingly — most everyday items fit an existing category.
 ${
   accounts.length > 0
     ? `- The user's accounts. If the note names or clearly implies one, set account to its id; otherwise OMIT the account field:
@@ -101,6 +105,7 @@ function buildResponseSchema(accounts: Account[]) {
         category: { type: 'STRING' },
         categoryName: { type: 'STRING' },
         categoryEmoji: { type: 'STRING' },
+        categoryParent: { type: 'STRING' },
         ...(accountEnum ? { account: accountEnum, toAccount: accountEnum } : {}),
         statedBalance: { type: 'NUMBER' },
         date: { type: 'STRING' },
@@ -245,6 +250,10 @@ export async function parseWithGemini(
         // Only carry new-category metadata when the id is genuinely new
         categoryName: existing || !newId ? undefined : (e.categoryName ?? titleCase(newId)),
         categoryEmoji: existing || !newId ? undefined : (e.categoryEmoji ?? '🏷️'),
+        categoryParent:
+          existing || !newId || !e.categoryParent || !validCategoryIds.has(e.categoryParent)
+            ? undefined
+            : e.categoryParent,
         account: recoveredAccount,
         toAccount: undefined,
       } satisfies ParsedEntry
@@ -313,6 +322,69 @@ ${txLines || '(none)'}`
     return (parsed.summary ?? '').trim()
   } catch {
     throw new GeminiError('Gemini returned invalid memory JSON')
+  }
+}
+
+/**
+ * Turn a free-text description ("vices - cigarettes and alcohol") into a
+ * complete Category for the user to add: id, name, emoji, classifier hints,
+ * and an optional parent when it belongs under an existing category.
+ */
+export async function generateCategory(description: string, existing: Category[]): Promise<Category> {
+  const prompt = `Create ONE spending/income category for a personal finance app from this
+description: "${description}"
+
+Existing categories (do not duplicate an id; if the new one naturally belongs UNDER one of
+these, set parent to that id — only one level of nesting is allowed, so a category that is
+itself a sub-category cannot be a parent):
+${existing.map(categoryLine).join('\n')}
+
+Return: id (short kebab-case, new), name (Title Case), emoji (one fitting emoji), type
+("expense" or "income"), hints (5-10 lowercase keywords/merchants an Indian user would write
+that should classify into this category), parent (existing id, or omit).`
+
+  const text = await callGemini({
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: {
+      temperature: 0,
+      maxOutputTokens: 512,
+      response_mime_type: 'application/json',
+      response_schema: {
+        type: 'OBJECT',
+        properties: {
+          id: { type: 'STRING' },
+          name: { type: 'STRING' },
+          emoji: { type: 'STRING' },
+          type: { type: 'STRING', enum: ['expense', 'income'] },
+          hints: { type: 'ARRAY', items: { type: 'STRING' } },
+          parent: { type: 'STRING' },
+        },
+        required: ['id', 'name', 'emoji', 'type', 'hints'],
+      },
+    },
+  })
+
+  let raw: Partial<Category>
+  try {
+    raw = JSON.parse(text) as Partial<Category>
+  } catch {
+    throw new GeminiError('Gemini returned an invalid category')
+  }
+  const existingIds = new Set(existing.map((c) => c.id))
+  let id = toKebabId(raw.id || raw.name || description)
+  if (!id) throw new GeminiError('Gemini returned an invalid category')
+  while (existingIds.has(id)) id = `${id}-2`
+  const parentCategory =
+    raw.parent && existingIds.has(raw.parent) ? existing.find((c) => c.id === raw.parent) : undefined
+  // Only one level of nesting; a subcategory always shares its parent's type
+  const parent = parentCategory && !parentCategory.parent ? parentCategory : undefined
+  return {
+    id,
+    name: raw.name?.trim() || titleCase(id),
+    emoji: raw.emoji?.trim() || '🏷️',
+    type: parent ? parent.type : raw.type === 'income' ? 'income' : 'expense',
+    hints: Array.isArray(raw.hints) ? raw.hints.filter((h) => typeof h === 'string' && h).slice(0, 12) : [],
+    parent: parent?.id,
   }
 }
 

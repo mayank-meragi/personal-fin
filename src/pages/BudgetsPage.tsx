@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import BudgetCard from '../components/BudgetCard'
 import MonthPicker from '../components/MonthPicker'
+import { categoryDisplayName } from '../lib/categories'
 import { effectiveLimit, useBudgets, useCategories } from '../hooks/useData'
 import { useTransactions } from '../hooks/useTransactions'
 import { currentMonthKey } from '../lib/dates'
@@ -26,6 +27,7 @@ export default function BudgetsPage() {
           <BudgetCard
             key={category.id}
             category={category}
+            displayName={categoryDisplayName(category, categories)}
             spent={spent[category.id] ?? 0}
             limit={effectiveLimit(budgets, month, category.id)}
             onLimitChange={(limit) => setMonthlyLimit(category.id, limit)}

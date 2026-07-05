@@ -9,12 +9,14 @@ import type { Category } from '../lib/types'
 
 interface Props {
   category: Category
+  /** Display label, e.g. "Investments › Mutual Funds" */
+  displayName?: string
   spent: number
   limit?: number
   onLimitChange: (limit: number | null) => void
 }
 
-export default function BudgetCard({ category, spent, limit, onLimitChange }: Props) {
+export default function BudgetCard({ category, displayName, spent, limit, onLimitChange }: Props) {
   const ratio = limit && limit > 0 ? spent / limit : null
   const over = ratio !== null && ratio > 1
   const near = ratio !== null && ratio >= 0.85 && ratio <= 1
@@ -30,7 +32,7 @@ export default function BudgetCard({ category, spent, limit, onLimitChange }: Pr
         >
           <Icon className="size-4" strokeWidth={2} />
         </span>
-        <span className="flex-1 text-sm font-semibold text-[var(--text-strong)]">{category.name}</span>
+        <span className="flex-1 text-sm font-semibold text-[var(--text-strong)]">{displayName ?? category.name}</span>
         <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
           limit ₹
           <Input

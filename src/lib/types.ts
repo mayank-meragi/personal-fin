@@ -45,6 +45,8 @@ export interface Category {
   type: TransactionType
   /** Keywords used by the fallback parser, CSV categorizer, and Gemini prompt */
   hints: string[]
+  /** Parent category id — makes this a subcategory (one level deep) */
+  parent?: string
 }
 
 export interface CategoriesFile {
@@ -75,6 +77,8 @@ export interface ParsedEntry {
   /** Set when the AI invented a category that doesn't exist yet */
   categoryName?: string
   categoryEmoji?: string
+  /** Parent id for an invented subcategory */
+  categoryParent?: string
   /** Account id (source for transfers); undefined means the user must pick one before saving */
   account?: string
   /** Destination account — transfers only */

@@ -18,6 +18,7 @@ import { hasGeminiKey, parseWithGemini, GeminiError, NoGeminiKeyError } from '..
 import { quickParse } from '../lib/quickParse'
 import { accountBalances, accountTypeEmoji, inferAccount } from '../lib/accounts'
 import { AI_MEMORY_PATH, emptyAiMemory, maybeRefreshAiMemory, type AiMemoryFile } from '../lib/aiMemory'
+import { groupedCategories } from '../lib/categories'
 import { categoryColor, categoryIcon, TRANSFER_COLOR } from '../lib/categoryIcon'
 import { todayISO } from '../lib/dates'
 import { formatINRExact } from '../lib/money'
@@ -205,6 +206,7 @@ export default function QuickEntry() {
           emoji: e.categoryEmoji ?? '🏷️',
           type: e.type === 'income' ? 'income' : 'expense',
           hints: [e.description],
+          parent: e.categoryParent,
         })
       }
     }
@@ -364,13 +366,25 @@ export default function QuickEntry() {
                           {entry.categoryEmoji ?? '🏷️'} {entry.categoryName ?? entry.category} (new)
                         </option>
                       )}
-                      {categories
-                        .filter((c) => c.type === entry.type)
-                        .map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.emoji} {c.name}
-                          </option>
-                        ))}
+                      {groupedCategories(categories, entry.type === 'income' ? 'income' : 'expense').map(
+                        ({ parent, children }) =>
+                          children.length > 0 ? (
+                            <optgroup key={parent.id} label={parent.name}>
+                              <option value={parent.id}>
+                                {parent.emoji} {parent.name}
+                              </option>
+                              {children.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.emoji} {c.name}
+                                </option>
+                              ))}
+                            </optgroup>
+                          ) : (
+                            <option key={parent.id} value={parent.id}>
+                              {parent.emoji} {parent.name}
+                            </option>
+                          ),
+                      )}
                     </select>
                   )}
                   {accounts.length > 0 && (

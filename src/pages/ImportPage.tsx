@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import CsvMapper from '../components/CsvMapper'
 import { fileQueryKey, useAccounts, useCategories } from '../hooks/useData'
+import { groupedCategories } from '../lib/categories'
 import { makeTransaction, useTransactionMutations } from '../hooks/useTransactions'
 import { extractRows, guessMapping, parseBankCsv, computeImportHash, type ColumnMapping, type ImportedRow, type RawCsv } from '../lib/csv'
 import { categorizeWithGemini, hasGeminiKey, GeminiError } from '../lib/gemini'
@@ -256,13 +257,24 @@ export default function ImportPage() {
                             )
                           }
                         >
-                          {categories
-                            .filter((c) => c.type === row.type)
-                            .map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.emoji} {c.name}
+                          {groupedCategories(categories, row.type).map(({ parent, children }) =>
+                            children.length > 0 ? (
+                              <optgroup key={parent.id} label={parent.name}>
+                                <option value={parent.id}>
+                                  {parent.emoji} {parent.name}
+                                </option>
+                                {children.map((c) => (
+                                  <option key={c.id} value={c.id}>
+                                    {c.emoji} {c.name}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            ) : (
+                              <option key={parent.id} value={parent.id}>
+                                {parent.emoji} {parent.name}
                               </option>
-                            ))}
+                            ),
+                          )}
                         </select>
                       </td>
                       <td

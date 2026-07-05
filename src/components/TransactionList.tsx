@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card'
 import { Amount } from './Amount'
 import { ArrowLeftRight, Pencil, Trash2 } from 'lucide-react'
 import { useAccounts, useCategories } from '../hooks/useData'
+import { categoryDisplayName } from '../lib/categories'
 import { categoryColor, categoryIcon, TRANSFER_COLOR } from '../lib/categoryIcon'
 import type { Transaction } from '../lib/types'
 
@@ -55,7 +56,7 @@ export default function TransactionList({ transactions, onEdit, onDelete }: Prop
                 {' · '}
                 {isTransfer
                   ? `${accName ?? '?'} → ${toAccName ?? '?'}`
-                  : `${cat?.name ?? tx.category}${accName ? ` · ${accName}` : ''}`}
+                  : `${cat ? categoryDisplayName(cat, categories) : tx.category}${accName ? ` · ${accName}` : ''}`}
                 {tx.source !== 'manual' ? ` · ${tx.source}` : ''}
               </p>
             </div>
