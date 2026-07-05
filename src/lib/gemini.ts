@@ -1,5 +1,6 @@
 import { getConfig } from './cache'
 import { todayISO } from './dates'
+import { parseBalanceDeclaration } from './quickParse'
 import type { Account, Category, ParsedEntry, Transaction } from './types'
 
 export class NoGeminiKeyError extends Error {}
@@ -54,11 +55,12 @@ Today is ${todayISO()} (IST). Rules:
   to the credit card; "withdrew 2000" transfers from a bank to cash). Omit either side you
   cannot infer. Transfers use category "transfer".
 - A BALANCE DECLARATION states what is LEFT in an account ("23k left in hdfc",
-  "balance 5000 in cash", "23k left in axis after mutual fund"). Set statedBalance to that
-  amount, account to the account id, type "expense", totalAmount 0 — the app computes the
-  difference from the account's current balance. If a cause is mentioned ("after mutual
-  fund"), use it as the description and pick or invent a fitting category; otherwise
-  description "balance adjustment" and category "other".
+  "balance 5000 in cash", "178457.72 left in axis after mutual fund deductions"). This is
+  NOT a transfer — never set toAccount for one. Return ONE entry with: type "expense",
+  totalAmount 0, statedBalance set to the stated amount (required — do not omit it), and
+  account set to the account id (in the "account" field, never "toAccount"). If a cause is
+  mentioned ("after mutual fund"), use it as the description and pick or invent a fitting
+  category; otherwise description "balance adjustment" and category "other".
 - Resolve relative dates (yesterday, last friday) to YYYY-MM-DD; omit the date field entirely if unstated.
 - Prefer a category id from this list:
 ${categoryLines}
@@ -117,8 +119,13 @@ async function callGemini(body: object): Promise<string> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify(body),
+      // A runaway generation otherwise leaves the UI in "Parsing…" forever
+      signal: AbortSignal.timeout(30_000),
     })
-  } catch {
+  } catch (e) {
+    if (e instanceof DOMException && (e.name === 'TimeoutError' || e.name === 'AbortError')) {
+      throw new GeminiError('Gemini took too long — tried simple parsing instead.')
+    }
     throw new GeminiError('Gemini unreachable — are you offline?')
   }
   if (res.status === 400 || res.status === 403) {
@@ -152,6 +159,9 @@ export async function parseWithGemini(
     contents: [{ parts }],
     generationConfig: {
       temperature: 0,
+      // Hard cap: a quick-entry parse is a handful of small objects. Without
+      // this, a degenerate generation loops until the model's own huge limit.
+      maxOutputTokens: 2048,
       response_mime_type: 'application/json',
       response_schema: buildResponseSchema(accounts),
     },
@@ -161,12 +171,44 @@ export async function parseWithGemini(
   try {
     parsed = JSON.parse(text)
   } catch {
-    throw new GeminiError('Gemini returned invalid JSON')
+    // Known degeneration: the model can spiral into infinite trailing zeros
+    // when emitting a long decimal (e.g. statedBalance 178457.72000000…),
+    // getting truncated at the token cap as invalid JSON. If the input is a
+    // balance declaration we can recover it exactly, deterministically.
+    const salvage = parseBalanceDeclaration(input, accounts, categories)
+    if (!salvage) throw new GeminiError('Gemini returned invalid JSON')
+    parsed = [salvage]
   }
   if (!Array.isArray(parsed)) throw new GeminiError('Gemini returned unexpected shape')
 
   const validCategoryIds = new Set(categories.map((c) => c.id))
   const validAccountIds = new Set(accounts.map((a) => a.id))
+
+  // Repair pass: the model sometimes recognizes a balance declaration (emits a
+  // ₹0 entry with the right description) but forgets the statedBalance field,
+  // which would get the entry filtered out below and the user a "could not
+  // find any transactions" dead end. Re-derive it deterministically from the
+  // input text and patch the broken entry — or synthesize one if the model
+  // returned nothing usable at all.
+  const declaration = parseBalanceDeclaration(input, accounts, categories)
+  if (declaration) {
+    const entries = parsed as Partial<ParsedEntry>[]
+    const alreadyHandled = entries.some((e) => e && typeof e.statedBalance === 'number')
+    if (!alreadyHandled) {
+      const broken = entries.find(
+        (e) => e && typeof e === 'object' && e.statedBalance == null && (!e.totalAmount || e.totalAmount === 0),
+      )
+      if (broken) {
+        broken.statedBalance = declaration.statedBalance
+        broken.totalAmount = 0
+        if (!broken.account || !validAccountIds.has(broken.account)) broken.account = declaration.account
+        broken.toAccount = undefined
+      } else if (entries.length === 0) {
+        entries.push(declaration)
+      }
+    }
+  }
+
   return parsed
     .filter((e): e is ParsedEntry => {
       if (typeof e !== 'object' || e === null) return false
@@ -191,6 +233,11 @@ export async function parseWithGemini(
       }
       const existing = validCategoryIds.has(e.category)
       const newId = existing ? e.category : toKebabId(e.category || '')
+      // Only transfers should ever carry toAccount — if the model misplaced the
+      // account there instead of `account` (seen with balance declarations),
+      // recover it rather than silently dropping the account.
+      const recoveredAccount =
+        account ?? (e.toAccount && validAccountIds.has(e.toAccount) ? e.toAccount : undefined)
       return {
         ...e,
         type: e.type === 'income' ? 'income' : 'expense',
@@ -198,7 +245,7 @@ export async function parseWithGemini(
         // Only carry new-category metadata when the id is genuinely new
         categoryName: existing || !newId ? undefined : (e.categoryName ?? titleCase(newId)),
         categoryEmoji: existing || !newId ? undefined : (e.categoryEmoji ?? '🏷️'),
-        account,
+        account: recoveredAccount,
         toAccount: undefined,
       } satisfies ParsedEntry
     })
@@ -252,6 +299,7 @@ ${txLines || '(none)'}`
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: {
       temperature: 0,
+      maxOutputTokens: 1024,
       response_mime_type: 'application/json',
       response_schema: {
         type: 'OBJECT',

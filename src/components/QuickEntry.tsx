@@ -138,7 +138,7 @@ export default function QuickEntry() {
       }
       setEntries(remaining)
     } catch (e) {
-      const fallback = withInferredAccounts(quickParse(input, categories))
+      const fallback = withInferredAccounts(quickParse(input, categories, accounts)).map(resolveStatedBalance)
       setEntries(fallback)
       if (e instanceof NoGeminiKeyError) {
         setNotice(
