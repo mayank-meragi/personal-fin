@@ -113,6 +113,8 @@ export async function generateNextWorkout(opts: {
   memory?: string
   /** A one-off ask for this workout ("make it a leg day", "something short") */
   request?: string
+  /** From the health module, when available */
+  body?: { weightKg?: number; lastNightSleepHours?: number }
 }): Promise<WorkoutSession> {
   const { profile, history, exercises } = opts
   const today = todayISO()
@@ -134,6 +136,12 @@ User profile:
 - Equipment available: ${profile.equipment.join(', ') || 'body only'}
 ${profile.injuries ? `- Injuries/limitations (NEVER program around these carelessly): ${profile.injuries}` : ''}
 ${profile.preferences ? `- Preferences: ${profile.preferences}` : ''}
+${opts.body?.weightKg ? `- Current body weight: ${opts.body.weightKg} kg` : ''}
+${
+  opts.body?.lastNightSleepHours != null && opts.body.lastNightSleepHours < 6
+    ? `- They slept only ${opts.body.lastNightSleepHours}h last night — recovery is compromised, keep intensity moderate today.`
+    : ''
+}
 ${opts.memory ? `- Coach's notes from past sessions:\n${opts.memory}` : ''}
 
 Adherence — weigh this heavily:

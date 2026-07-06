@@ -9,7 +9,7 @@ import {
   isConfigured,
 } from './cache'
 import { mergeFile } from './merge'
-import { FINANCE_PATHS, FITNESS_PATHS, SETTINGS_PATH } from './paths'
+import { FINANCE_PATHS, FITNESS_PATHS, HEALTH_PATHS, SETTINGS_PATH } from './paths'
 import { defaultCategories } from '../defaults/categories'
 import type { AccountsFile, BudgetsFile, SettingsFile } from './types'
 
@@ -205,7 +205,19 @@ export async function resetAllData(): Promise<void> {
   for (const f of workoutFiles) {
     await gh.deleteFile(`${FITNESS_PATHS.workoutsDir}/${f.name}`, f.sha, `Reset: delete ${f.name}`)
   }
-  for (const path of [FINANCE_PATHS.aiMemory, FITNESS_PATHS.profile, FITNESS_PATHS.plan, FITNESS_PATHS.memory]) {
+  const mealFiles = await gh.listDir(HEALTH_PATHS.mealsDir)
+  for (const f of mealFiles) {
+    await gh.deleteFile(`${HEALTH_PATHS.mealsDir}/${f.name}`, f.sha, `Reset: delete ${f.name}`)
+  }
+  for (const path of [
+    FINANCE_PATHS.aiMemory,
+    FITNESS_PATHS.profile,
+    FITNESS_PATHS.plan,
+    FITNESS_PATHS.memory,
+    HEALTH_PATHS.metrics,
+    HEALTH_PATHS.sleep,
+    HEALTH_PATHS.targets,
+  ]) {
     const file = await gh.getFile(path)
     if (file) await gh.deleteFile(path, file.sha, `Reset: delete ${path}`)
   }

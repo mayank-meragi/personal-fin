@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { ArrowLeftRight, Dumbbell } from 'lucide-react'
 import QuickEntry from '@/modules/finance/components/QuickEntry'
+import HealthCard from '@/modules/health/components/HealthCard'
 import { Amount } from '@/components/Amount'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -140,6 +141,11 @@ export default function HubPage() {
             <p className="text-xs font-semibold text-[var(--brand)]">
               {profile ? `${week} of ${profile.daysPerWeek} workouts this week` : week > 0 ? `${week} workouts this week` : 'no workouts yet'}
             </p>
+          </Card>
+        </Link>
+        <Link to="/health" className="col-span-2">
+          <Card className="gap-1 p-4">
+            <HealthCard />
           </Card>
         </Link>
       </div>

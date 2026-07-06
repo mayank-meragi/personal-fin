@@ -9,8 +9,9 @@ import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { todayISO } from '@/lib/dates'
 import { AiError, NoAiKeyError, hasAiKey } from '@/lib/ai'
-import { FITNESS_PATHS } from '@/lib/paths'
+import { FITNESS_PATHS, HEALTH_PATHS } from '@/lib/paths'
 import { getCachedFile } from '@/lib/cache'
+import type { BodyMetric, SleepEntry } from '@/modules/health/lib/types'
 import { useExercises } from '../lib/exerciseDb'
 import { savePlan, saveProfile, useAllWorkouts, usePlan, useProfile } from '../lib/data'
 import { generateNextWorkout } from '../lib/planner'
@@ -145,7 +146,18 @@ export default function PlanPage() {
     setError(null)
     try {
       const memory = getCachedFile<FitnessMemoryFile>(FITNESS_PATHS.memory)?.content.summary
-      const workout = await generateNextWorkout({ profile, history: sessions, exercises, memory })
+      const metrics = getCachedFile<BodyMetric[]>(HEALTH_PATHS.metrics)?.content ?? []
+      const sleep = getCachedFile<SleepEntry[]>(HEALTH_PATHS.sleep)?.content ?? []
+      const workout = await generateNextWorkout({
+        profile,
+        history: sessions,
+        exercises,
+        memory,
+        body: {
+          weightKg: metrics[metrics.length - 1]?.weightKg,
+          lastNightSleepHours: sleep.find((s) => s.date === todayISO())?.hours,
+        },
+      })
       savePlan(qc, { next: workout, generatedAt: new Date().toISOString() })
     } catch (e) {
       setError(

@@ -21,4 +21,12 @@ export const FITNESS_PATHS = {
   memory: 'fitness/memory.json',
 } as const
 
+export const HEALTH_PATHS = {
+  metrics: 'health/metrics.json',
+  meals: (month: string) => `health/meals/${month}.json`,
+  mealsDir: 'health/meals',
+  sleep: 'health/sleep.json',
+  targets: 'health/targets.json',
+} as const
+
 export const SETTINGS_PATH = 'settings.json'

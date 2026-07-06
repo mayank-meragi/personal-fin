@@ -155,3 +155,12 @@ Each phase builds, screenshots, and works standalone; push whenever you say.
   finalized — root finance files re-synced to `finance/` and deleted
   (`scripts/migrate-finance-data.sh --delete-originals`); repo root is now just
   `finance/`, `fitness/`, `settings.json`.
+
+## Health module (added 2026-07-06)
+
+Food / Body / Sleep tabs under `health/` in the data repo (`meals/YYYY-MM.json`,
+`metrics.json`, `sleep.json`, `targets.json`). AI meal parsing (text + photo, Indian
+portions), AI-suggested calorie/protein targets from the fitness profile, weight trend
+sparkline, sleep log with quality. Assistant tools: log_meal, log_weight, log_sleep.
+The workout planner now receives current weight and flags short sleep (<6h) for
+recovery-aware programming. Hub shows a full-width health card.

@@ -7,7 +7,11 @@ import { currentMonthKey, todayISO, transactionsPath } from '../dates'
 import { fileQueryKey } from '../queryKeys'
 import { splitSpendingSavings, totals } from '../stats'
 import { toKebabId } from '../ai'
-import { FINANCE_PATHS, FITNESS_PATHS } from '../paths'
+import { FINANCE_PATHS, FITNESS_PATHS, HEALTH_PATHS } from '../paths'
+import { deleteMeal, saveMeal, saveMetric, saveSleep } from '@/modules/health/lib/data'
+import * as actionsHealth from '@/modules/health/lib/data'
+import { parseMeal } from '@/modules/health/lib/nutrition'
+import type { BodyMetric, Meal, NutritionTargets, SleepEntry } from '@/modules/health/lib/types'
 import { listDir } from '../github'
 import { loadFile } from '../sync'
 import type { ToolDef } from '../llm'
@@ -85,6 +89,19 @@ function fitnessOverview(qc: QueryClient): string {
   return `Fitness: goal ${profile.goal}, intends ${profile.daysPerWeek} sessions/week; ${planLine}.`
 }
 
+function healthOverview(qc: QueryClient): string {
+  const today = todayISO()
+  const meals = readFile<Meal[]>(qc, HEALTH_PATHS.meals(currentMonthKey()), []).filter((m) => m.date === today)
+  const targets = readFile<NutritionTargets | null>(qc, HEALTH_PATHS.targets, null)
+  const metrics = readFile<BodyMetric[]>(qc, HEALTH_PATHS.metrics, [])
+  const sleep = readFile<SleepEntry[]>(qc, HEALTH_PATHS.sleep, [])
+  const calories = meals.reduce((s, m) => s + m.calories, 0)
+  const protein = meals.reduce((s, m) => s + m.proteinG, 0)
+  const latest = metrics[metrics.length - 1]
+  const lastNight = sleep.find((s) => s.date === today)
+  return `Health: today ${calories}${targets ? `/${targets.calories}` : ''} kcal, ${protein}${targets ? `/${targets.proteinG}` : ''}g protein; weight ${latest ? `${latest.weightKg}kg (${latest.date})` : 'never logged'}; last night's sleep ${lastNight ? `${lastNight.hours}h` : 'not logged'}.`
+}
+
 export function buildOverview(qc: QueryClient): string {
   const accounts = getAccounts(qc)
   const categories = getCategories(qc)
@@ -116,7 +133,8 @@ Accounts:
 ${accountLines || '(none)'}
 Categories:
 ${categoryLines || '(none)'}
-${fitnessOverview(qc)}`
+${fitnessOverview(qc)}
+${healthOverview(qc)}`
 }
 
 // ---- Tool declarations (provider-neutral; adapters convert the schemas) ----
@@ -134,6 +152,9 @@ const PAGES: Record<string, string> = {
   exercises: '/fitness/exercises',
   'workout-history': '/fitness/history',
   plan: '/fitness/plan',
+  food: '/health',
+  body: '/health/body',
+  sleep: '/health/sleep',
 }
 
 export const functionDeclarations: ToolDef[] = [
@@ -358,6 +379,39 @@ export const functionDeclarations: ToolDef[] = [
     },
   },
   {
+    name: 'log_meal',
+    description:
+      'Log food eaten today from informal text ("2 rotis and dal, 100g paneer"). AI estimates calories and protein.',
+    parameters: {
+      type: 'object',
+      properties: { food: { type: 'string', description: 'what the user ate, in their words' } },
+      required: ['food'],
+    },
+  },
+  {
+    name: 'log_weight',
+    description: 'Log today\'s body weight (kg), optionally waist (cm).',
+    parameters: {
+      type: 'object',
+      properties: { weightKg: { type: 'number' }, waistCm: { type: 'number' } },
+      required: ['weightKg'],
+    },
+  },
+  {
+    name: 'log_sleep',
+    description:
+      'Log last night\'s sleep. Give hours directly, or bedTime/wakeTime as HH:MM. quality is 1 (rough) to 5 (great).',
+    parameters: {
+      type: 'object',
+      properties: {
+        hours: { type: 'number' },
+        bedTime: { type: 'string' },
+        wakeTime: { type: 'string' },
+        quality: { type: 'number' },
+      },
+    },
+  },
+  {
     name: 'navigate',
     description: 'Take the user to a page of the app.',
     parameters: {
@@ -377,6 +431,9 @@ export const functionDeclarations: ToolDef[] = [
             'exercises',
             'workout-history',
             'plan',
+            'food',
+            'body',
+            'sleep',
           ],
         },
       },
@@ -647,11 +704,17 @@ export async function executeTool(name: string, args: Args, ctx: ToolContext): P
         return { error: 'no training profile yet — send the user to the fitness Plan page to set one up' }
       }
       const [exercises, history] = await Promise.all([fetchExercises(), loadAllWorkouts()])
+      const metrics = readFile<BodyMetric[]>(qc, HEALTH_PATHS.metrics, [])
+      const sleepLog = readFile<SleepEntry[]>(qc, HEALTH_PATHS.sleep, [])
       const workout = await generateNextWorkout({
         profile,
         history,
         exercises,
         request: args.request ? String(args.request) : undefined,
+        body: {
+          weightKg: metrics[metrics.length - 1]?.weightKg,
+          lastNightSleepHours: sleepLog.find((s) => s.date === todayISO())?.hours,
+        },
       })
       savePlan(qc, { next: workout, generatedAt: new Date().toISOString() })
       ctx.onAction({
@@ -690,6 +753,66 @@ export async function executeTool(name: string, args: Args, ctx: ToolContext): P
           exercises: result.workout.exercises.map((e) => `${e.name} ${setSummary(e.sets)}`),
         },
       }
+    }
+
+    case 'log_meal': {
+      const food = String(args.food ?? '').trim()
+      if (!food) return { error: 'empty meal' }
+      const meal = await parseMeal(food)
+      saveMeal(qc, meal)
+      ctx.onAction({
+        label: `Logged meal: ${meal.calories} kcal · ${meal.proteinG}g protein`,
+        undo: () => deleteMeal(qc, meal),
+      })
+      return { ok: true, calories: meal.calories, proteinG: meal.proteinG, items: meal.items.map((i) => i.name) }
+    }
+
+    case 'log_weight': {
+      const weightKg = Number(args.weightKg)
+      if (!Number.isFinite(weightKg) || weightKg < 20 || weightKg > 300) return { error: 'implausible weight' }
+      const metric: BodyMetric = {
+        id: crypto.randomUUID(),
+        date: todayISO(),
+        weightKg: Math.round(weightKg * 10) / 10,
+        waistCm: Number(args.waistCm) > 0 ? Math.round(Number(args.waistCm) * 10) / 10 : undefined,
+      }
+      saveMetric(qc, metric)
+      ctx.onAction({
+        label: `Logged weight ${metric.weightKg} kg`,
+        undo: () => {
+          const { deleteMetric } = actionsHealth
+          deleteMetric(qc, metric.id)
+        },
+      })
+      return { ok: true }
+    }
+
+    case 'log_sleep': {
+      let hours = Number(args.hours)
+      const bedTime = typeof args.bedTime === 'string' && /^\d{1,2}:\d{2}$/.test(args.bedTime) ? args.bedTime : undefined
+      const wakeTime = typeof args.wakeTime === 'string' && /^\d{1,2}:\d{2}$/.test(args.wakeTime) ? args.wakeTime : undefined
+      if ((!Number.isFinite(hours) || hours <= 0) && bedTime && wakeTime) {
+        const [bh, bm] = bedTime.split(':').map(Number)
+        const [wh, wm] = wakeTime.split(':').map(Number)
+        let minutes = wh * 60 + wm - (bh * 60 + bm)
+        if (minutes <= 0) minutes += 24 * 60
+        hours = Math.round((minutes / 60) * 10) / 10
+      }
+      if (!Number.isFinite(hours) || hours <= 0 || hours > 20) return { error: 'need hours, or bedTime and wakeTime' }
+      const entry: SleepEntry = {
+        id: crypto.randomUUID(),
+        date: todayISO(),
+        hours: Math.round(hours * 10) / 10,
+        bedTime,
+        wakeTime,
+        quality: Number(args.quality) >= 1 && Number(args.quality) <= 5 ? Math.round(Number(args.quality)) : undefined,
+      }
+      saveSleep(qc, entry)
+      ctx.onAction({
+        label: `Logged sleep ${entry.hours}h`,
+        undo: () => actionsHealth.deleteSleep(qc, entry.id),
+      })
+      return { ok: true }
     }
 
     case 'navigate': {
