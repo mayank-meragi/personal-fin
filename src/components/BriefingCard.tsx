@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { CreditCard, Dumbbell, Moon, RefreshCw, Sparkles, UtensilsCrossed } from 'lucide-react'
+import { ChevronDown, ChevronUp, CreditCard, Dumbbell, Moon, RefreshCw, Sparkles, UtensilsCrossed } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { AiError, NoAiKeyError, hasAiKey } from '@/lib/ai'
@@ -15,11 +15,21 @@ const AREA_META: Record<BriefingArea, { icon: typeof CreditCard; to: string }> =
 }
 
 /** On-demand daily briefing: one AI call per daypart, cached for the day. */
+const COLLAPSE_KEY = 'pf.briefingCollapsed'
+
 export default function BriefingCard() {
   const qc = useQueryClient()
   const [briefing, setBriefing] = useState<Briefing | null>(cachedBriefing)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) === '1')
+
+  function toggleCollapsed() {
+    setCollapsed((prev) => {
+      localStorage.setItem(COLLAPSE_KEY, prev ? '0' : '1')
+      return !prev
+    })
+  }
 
   async function generate() {
     if (busy) return
@@ -29,6 +39,8 @@ export default function BriefingCard() {
       const next = await generateBriefing(qc)
       storeBriefing(next)
       setBriefing(next)
+      setCollapsed(false)
+      localStorage.setItem(COLLAPSE_KEY, '0')
     } catch (e) {
       setError(
         e instanceof NoAiKeyError
@@ -64,10 +76,26 @@ export default function BriefingCard() {
     )
   }
 
+  // Collapsed: just the action, one tap to expand
+  if (collapsed) {
+    return (
+      <button
+        type="button"
+        onClick={toggleCollapsed}
+        className="flex w-full items-center gap-2.5 rounded-[var(--radius-lg)] bg-[var(--brand)] px-3.5 py-2.5 text-left shadow-[var(--shadow-md)] transition-transform active:scale-[0.99]"
+      >
+        <span className="flex-1 text-xs font-semibold text-[var(--ink-900)]">
+          {briefing.nudge || briefing.headline}
+        </span>
+        <ChevronDown className="size-4 shrink-0 text-[var(--ink-900)]/60" />
+      </button>
+    )
+  }
+
   return (
     <Card className="border-none bg-[var(--ink-900)] text-white">
       <CardContent className="space-y-3 py-4">
-        <div className="flex items-start gap-2">
+        <div className="flex items-start gap-1">
           <p className="flex-1 text-sm leading-snug font-semibold">{briefing.headline}</p>
           <button
             type="button"
@@ -77,6 +105,14 @@ export default function BriefingCard() {
             className="shrink-0 rounded-full p-1.5 text-white/60 hover:bg-white/10 hover:text-white"
           >
             <RefreshCw className={cn('size-3.5', busy && 'animate-spin')} />
+          </button>
+          <button
+            type="button"
+            aria-label="Collapse briefing"
+            onClick={toggleCollapsed}
+            className="shrink-0 rounded-full p-1.5 text-white/60 hover:bg-white/10 hover:text-white"
+          >
+            <ChevronUp className="size-3.5" />
           </button>
         </div>
 

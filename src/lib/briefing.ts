@@ -7,6 +7,7 @@ import { fileQueryKey } from './queryKeys'
 import type { Transaction } from './types'
 import type { FitnessProfile, PlanFile, WorkoutSession } from '@/modules/fitness/lib/types'
 import { daysSince, thisWeekCount } from '@/modules/fitness/lib/stats'
+import { inferMealType } from '@/modules/health/lib/nutrition'
 import type { BodyMetric, Meal, NutritionTargets, SleepEntry } from '@/modules/health/lib/types'
 
 export type BriefingArea = 'money' | 'food' | 'workout' | 'sleep'
@@ -76,14 +77,19 @@ function buildContext(qc: QueryClient): string {
   const metrics = readFile<BodyMetric[]>(qc, HEALTH_PATHS.metrics, [])
   const weight = metrics[metrics.length - 1]
 
-  return `Date: ${today}, time now: ${new Date().toTimeString().slice(0, 5)} (${daypartNow()}).
+  const mealsLogged = [...new Set(meals.map((m) => m.mealType ?? inferMealType(new Date(m.createdAt))))]
+  const hour = new Date().getHours()
+  const isLate = hour >= 22 || hour < 4
+
+  return `Date: ${today}, time now: ${new Date().toTimeString().slice(0, 5)} (${daypartNow()}${isLate ? ', LATE NIGHT' : ''}).
 
 MONEY
 - Today: spent ₹${Math.round(todaySpend)} over ${todayTx.length} transactions${txLines ? ` — ${txLines}` : ''}
 - Month so far: ₹${Math.round(monthSpend)} spent
 
 FOOD
-- Today: ${calories} kcal${targets ? ` of ${targets.calories} target (${Math.max(targets.calories - calories, 0)} left)` : ''}, ${protein}g protein${targets ? ` of ${targets.proteinG} target (${Math.max(targets.proteinG - protein, 0)}g left)` : ''}; ${meals.length} meals logged
+- Today: ${calories} kcal${targets ? ` of ${targets.calories} target (${Math.max(targets.calories - calories, 0)} left)` : ''}, ${protein}g protein${targets ? ` of ${targets.proteinG} target (${Math.max(targets.proteinG - protein, 0)}g left)` : ''}
+- Meals logged today: ${mealsLogged.join(', ') || 'none'}${mealsLogged.includes('dinner') ? ' — DINNER IS DONE, the eating day is over' : ''}
 - Foods they actually eat often: ${frequentFoods.join(', ') || 'unknown yet'}
 
 WORKOUT
@@ -123,11 +129,15 @@ export async function generateBriefing(qc: QueryClient): Promise<Briefing> {
 sleep all tracked here). Coach, don't report: say what to DO with the rest of today, using the
 numbers given. Rules:
 - At most one item per area; SKIP areas with nothing useful to say. 2-4 items total.
-- Food: if protein/calories remain, suggest a realistic dinner/snack from foods they actually
-  eat (list provided) with rough quantities that close the gap.
+- Food: if meals remain in the day and protein/calories are short, suggest a realistic next
+  meal from foods they actually eat (list provided) with rough quantities that close the gap.
+- BUT if dinner is already logged or it's LATE NIGHT: the eating day is OVER. Never suggest
+  eating now — state the shortfall as a fact and what to change tomorrow ("ended 107g short;
+  front-load protein at lunch tomorrow"), and make winding down for sleep the priority.
 - Sleep: recommend tonight's bedtime from their usual wake time and 7.5h target, especially if
-  the recent average is short.
+  the recent average is short. LATE NIGHT means the bedtime is "now".
 - Workout: nudge to start/finish if one is planned and the day allows; respect rest days.
+  Never suggest starting a workout LATE NIGHT — say when to do it tomorrow instead.
 - Money: only mention if today was unusual (big spend, vices) — no generic budget talk.
 - The nudge is one short imperative sentence — the single best action right now.
 - Plain warm language, INR, no emoji, no markdown. Numbers over adjectives.`,
