@@ -1,5 +1,5 @@
 import { Flame } from 'lucide-react'
-import { todayISO } from '@/lib/dates'
+import { effectiveTodayISO } from '@/lib/dates'
 import { useAllWorkouts, usePlan, useProfile } from '../lib/data'
 import { currentStreak, daysSince, lastSessionDate, thisWeekCount } from '../lib/stats'
 
@@ -8,7 +8,7 @@ export default function FitnessCard() {
   const { profile } = useProfile()
   const { data: plan } = usePlan()
   const { sessions } = useAllWorkouts()
-  const today = todayISO()
+  const today = effectiveTodayISO()
 
   const doneToday = sessions.some((s) => s.date === today)
   const streak = currentStreak(sessions, today)

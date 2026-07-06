@@ -3,7 +3,7 @@ import { Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { todayISO } from '@/lib/dates'
+import { effectiveTodayISO } from '@/lib/dates'
 import { useHealthMutations, useSleep } from '../lib/data'
 import type { SleepEntry } from '../lib/types'
 
@@ -26,7 +26,7 @@ const QUALITY = ['rough', 'meh', 'ok', 'good', 'great']
 export default function SleepPage() {
   const sleep = useSleep()
   const { addSleep, removeSleep } = useHealthMutations()
-  const today = todayISO()
+  const today = effectiveTodayISO()
   const [bedTime, setBedTime] = useState('23:00')
   const [wakeTime, setWakeTime] = useState('07:00')
   const [quality, setQuality] = useState<number | undefined>()

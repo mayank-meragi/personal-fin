@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
-import { todayISO } from '@/lib/dates'
+import { effectiveTodayISO } from '@/lib/dates'
 import { AiError, NoAiKeyError, hasAiKey } from '@/lib/ai'
 import { FITNESS_PATHS, HEALTH_PATHS } from '@/lib/paths'
 import { getCachedFile } from '@/lib/cache'
@@ -138,7 +138,7 @@ export default function PlanPage() {
   const [error, setError] = useState<string | null>(null)
 
   const last = lastSessionDate(sessions)
-  const gap = last ? daysSince(last, todayISO()) : null
+  const gap = last ? daysSince(last, effectiveTodayISO()) : null
 
   async function generate() {
     if (!profile || !exercises || generating) return
@@ -155,7 +155,7 @@ export default function PlanPage() {
         memory,
         body: {
           weightKg: metrics[metrics.length - 1]?.weightKg,
-          lastNightSleepHours: sleep.find((s) => s.date === todayISO())?.hours,
+          lastNightSleepHours: sleep.find((s) => s.date === effectiveTodayISO())?.hours,
         },
       })
       savePlan(qc, { next: workout, generatedAt: new Date().toISOString() })

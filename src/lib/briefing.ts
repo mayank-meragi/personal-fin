@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { getCachedFile } from './cache'
-import { currentMonthKey, todayISO } from './dates'
+import { effectiveTodayISO, monthKey } from './dates'
 import { AiError, generateJson } from './llm'
 import { FINANCE_PATHS, FITNESS_PATHS, HEALTH_PATHS } from './paths'
 import { fileQueryKey } from './queryKeys'
@@ -17,6 +17,8 @@ export interface Briefing {
   items: { area: BriefingArea; text: string }[]
   nudge: string
   generatedAt: string
+  /** the human day it was generated for (00:30 = yesterday) */
+  day: string
   daypart: Daypart
 }
 
@@ -24,6 +26,7 @@ type Daypart = 'morning' | 'afternoon' | 'evening'
 
 function daypartNow(): Daypart {
   const hour = new Date().getHours()
+  if (hour < 4) return 'evening' // past midnight = still the previous evening
   if (hour < 12) return 'morning'
   if (hour < 18) return 'afternoon'
   return 'evening'
@@ -35,8 +38,9 @@ function readFile<T>(qc: QueryClient, path: string, fallback: T): T {
 
 /** Everything the model needs, computed deterministically — it coaches, we count. */
 function buildContext(qc: QueryClient): string {
-  const today = todayISO()
-  const month = currentMonthKey()
+  // The human day: 00:30 still belongs to yesterday's evening
+  const today = effectiveTodayISO()
+  const month = monthKey(today)
 
   // Money
   const monthTx = readFile<Transaction[]>(qc, FINANCE_PATHS.transactions(month), [])
@@ -165,6 +169,7 @@ numbers given. Rules:
     items,
     nudge: (raw.nudge ?? '').trim(),
     generatedAt: new Date().toISOString(),
+    day: effectiveTodayISO(),
     daypart: daypartNow(),
   }
 }
@@ -177,7 +182,7 @@ export function cachedBriefing(): Briefing | null {
     const raw = localStorage.getItem(CACHE_KEY)
     if (!raw) return null
     const briefing = JSON.parse(raw) as Briefing
-    if (briefing.generatedAt.slice(0, 10) !== todayISO() || briefing.daypart !== daypartNow()) return null
+    if (briefing.day !== effectiveTodayISO() || briefing.daypart !== daypartNow()) return null
     return briefing
   } catch {
     return null

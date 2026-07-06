@@ -1,11 +1,11 @@
 import { Moon, Scale } from 'lucide-react'
-import { currentMonthKey, todayISO } from '@/lib/dates'
+import { effectiveTodayISO, monthKey } from '@/lib/dates'
 import { useMealsMonth, useMetrics, useSleep, useTargets } from '../lib/data'
 
 /** Live headline on the hub card. */
 export default function HealthCard() {
-  const today = todayISO()
-  const meals = useMealsMonth(currentMonthKey())
+  const today = effectiveTodayISO()
+  const meals = useMealsMonth(monthKey(today))
   const targets = useTargets()
   const metrics = useMetrics()
   const sleep = useSleep()

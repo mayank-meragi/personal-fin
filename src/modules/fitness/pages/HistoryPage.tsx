@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Pencil, Trash2, Trophy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { todayISO } from '@/lib/dates'
+import { effectiveTodayISO } from '@/lib/dates'
 import { exerciseById, useExercises } from '../lib/exerciseDb'
 import { deleteSession, useAllWorkouts } from '../lib/data'
 import { currentStreak, daysSince, formatSet, personalRecords, sessionVolume, setSummary, thisWeekCount, volumeByMuscle } from '../lib/stats'
@@ -82,7 +82,7 @@ export default function HistoryPage() {
   const { data: exercises } = useExercises()
   const [showAllPrs, setShowAllPrs] = useState(false)
   const [editing, setEditing] = useState<WorkoutSession | null>(null)
-  const today = todayISO()
+  const today = effectiveTodayISO()
   const newest = [...sessions].reverse()
   const prs = personalRecords(sessions)
   const weekSessions = sessions.filter((s) => daysSince(s.date, today) < 7)

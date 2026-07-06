@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { getConfig } from '@/lib/cache'
 import { categoryColor, categoryIcon, TRANSFER_COLOR } from '@/lib/categoryIcon'
-import { currentMonthKey, todayISO } from '@/lib/dates'
+import { currentMonthKey, effectiveTodayISO } from '@/lib/dates'
 import { totals } from '@/lib/stats'
 import { accountBalances } from '@/lib/accounts'
 import { useAccounts, useCategories } from '@/hooks/useData'
@@ -56,7 +56,7 @@ type FeedItem =
 
 export default function HubPage() {
   const name = ownerFirstName()
-  const today = todayISO()
+  const today = effectiveTodayISO()
   const { accounts } = useAccounts()
   const { categories } = useCategories()
   const { transactions } = useAllTransactions()

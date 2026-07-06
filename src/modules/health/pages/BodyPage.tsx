@@ -3,7 +3,7 @@ import { Check, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { todayISO } from '@/lib/dates'
+import { effectiveTodayISO } from '@/lib/dates'
 import { useHealthMutations, useMetrics } from '../lib/data'
 import type { BodyMetric } from '../lib/types'
 
@@ -115,7 +115,7 @@ export default function BodyPage() {
               onClick={() => {
                 addMetric({
                   id: crypto.randomUUID(),
-                  date: todayISO(),
+                  date: effectiveTodayISO(),
                   weightKg: Math.round(Number(weight) * 10) / 10,
                   waistCm: Number(waist) > 0 ? Math.round(Number(waist) * 10) / 10 : undefined,
                 })

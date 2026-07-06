@@ -5,7 +5,7 @@ import { Check, ClipboardList, Flag, Plus, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { todayISO } from '@/lib/dates'
+import { effectiveTodayISO } from '@/lib/dates'
 import { AiError, NoAiKeyError } from '@/lib/ai'
 import { FITNESS_PATHS } from '@/lib/paths'
 import { getCachedFile } from '@/lib/cache'
@@ -40,7 +40,7 @@ export default function TodayPage() {
   const { sessions } = useAllWorkouts()
   const { data: exercises } = useExercises()
   const byId = exerciseById(exercises ?? [])
-  const today = todayISO()
+  const today = effectiveTodayISO()
   const doneToday = sessions.filter((s) => s.date === today)
 
   const [timer, setTimer] = useState<{ startedAt: number; seconds: number } | null>(null)

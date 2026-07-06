@@ -16,6 +16,18 @@ export function todayISO(): string {
   return toISODate(new Date())
 }
 
+/**
+ * The HUMAN day, which ends when you sleep, not at midnight: 00:00–03:59
+ * still belongs to yesterday. Lifestyle modules (food, workouts, sleep,
+ * the briefing) live on this clock; finance stays on calendar dates to
+ * match bank statements.
+ */
+export function effectiveTodayISO(): string {
+  const d = new Date()
+  if (d.getHours() < 4) d.setDate(d.getDate() - 1)
+  return toISODate(d)
+}
+
 export function currentMonthKey(): string {
   return monthKey(new Date())
 }

@@ -1,5 +1,5 @@
 import { generateJson, type ImageAttachment } from './llm'
-import { todayISO } from './dates'
+import { effectiveTodayISO } from './dates'
 import { fetchExercises } from '@/modules/fitness/lib/exerciseDb'
 import { parseQuickLog } from '@/modules/fitness/lib/planner'
 import type { WorkoutSession } from '@/modules/fitness/lib/types'
@@ -130,7 +130,7 @@ When genuinely torn between money and food, prices win: money.`,
         kind: 'sleep',
         entry: {
           id: crypto.randomUUID(),
-          date: todayISO(),
+          date: effectiveTodayISO(),
           hours: Math.round(hours * 10) / 10,
           bedTime,
           wakeTime,
@@ -146,7 +146,7 @@ When genuinely torn between money and food, prices win: money.`,
         kind: 'weight',
         metric: {
           id: crypto.randomUUID(),
-          date: todayISO(),
+          date: effectiveTodayISO(),
           weightKg: Math.round(weightKg * 10) / 10,
           waistCm: Number(c.waistCm) > 0 ? Math.round(Number(c.waistCm) * 10) / 10 : undefined,
         },

@@ -20,7 +20,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { AiError, NoAiKeyError, hasAiKey } from '@/lib/ai'
-import { currentMonthKey, todayISO } from '@/lib/dates'
+import { effectiveTodayISO, monthKey } from '@/lib/dates'
 import { getCachedFile } from '@/lib/cache'
 import { FITNESS_PATHS } from '@/lib/paths'
 import type { FitnessMemoryFile, FitnessProfile } from '@/modules/fitness/lib/types'
@@ -117,8 +117,8 @@ function MacroRow({
 
 export default function FoodPage() {
   const qc = useQueryClient()
-  const today = todayISO()
-  const meals = useMealsMonth(currentMonthKey())
+  const today = effectiveTodayISO()
+  const meals = useMealsMonth(monthKey(today))
   const targets = useTargets()
   const metrics = useMetrics()
   const { removeMeal, setTargets } = useHealthMutations()

@@ -3,7 +3,7 @@ import * as actions from '../actions'
 import { accountBalances } from '../accounts'
 import { getCachedFile } from '../cache'
 import { categoryDisplayName } from '../categories'
-import { currentMonthKey, todayISO, transactionsPath } from '../dates'
+import { currentMonthKey, effectiveTodayISO, monthKey, todayISO, transactionsPath } from '../dates'
 import { fileQueryKey } from '../queryKeys'
 import { splitSpendingSavings, totals } from '../stats'
 import { toKebabId } from '../ai'
@@ -90,8 +90,8 @@ function fitnessOverview(qc: QueryClient): string {
 }
 
 function healthOverview(qc: QueryClient): string {
-  const today = todayISO()
-  const meals = readFile<Meal[]>(qc, HEALTH_PATHS.meals(currentMonthKey()), []).filter((m) => m.date === today)
+  const today = effectiveTodayISO()
+  const meals = readFile<Meal[]>(qc, HEALTH_PATHS.meals(monthKey(today)), []).filter((m) => m.date === today)
   const targets = readFile<NutritionTargets | null>(qc, HEALTH_PATHS.targets, null)
   const metrics = readFile<BodyMetric[]>(qc, HEALTH_PATHS.metrics, [])
   const sleep = readFile<SleepEntry[]>(qc, HEALTH_PATHS.sleep, [])
@@ -713,7 +713,7 @@ export async function executeTool(name: string, args: Args, ctx: ToolContext): P
         request: args.request ? String(args.request) : undefined,
         body: {
           weightKg: metrics[metrics.length - 1]?.weightKg,
-          lastNightSleepHours: sleepLog.find((s) => s.date === todayISO())?.hours,
+          lastNightSleepHours: sleepLog.find((s) => s.date === effectiveTodayISO())?.hours,
         },
       })
       savePlan(qc, { next: workout, generatedAt: new Date().toISOString() })
@@ -772,7 +772,7 @@ export async function executeTool(name: string, args: Args, ctx: ToolContext): P
       if (!Number.isFinite(weightKg) || weightKg < 20 || weightKg > 300) return { error: 'implausible weight' }
       const metric: BodyMetric = {
         id: crypto.randomUUID(),
-        date: todayISO(),
+        date: effectiveTodayISO(),
         weightKg: Math.round(weightKg * 10) / 10,
         waistCm: Number(args.waistCm) > 0 ? Math.round(Number(args.waistCm) * 10) / 10 : undefined,
       }
@@ -801,7 +801,7 @@ export async function executeTool(name: string, args: Args, ctx: ToolContext): P
       if (!Number.isFinite(hours) || hours <= 0 || hours > 20) return { error: 'need hours, or bedTime and wakeTime' }
       const entry: SleepEntry = {
         id: crypto.randomUUID(),
-        date: todayISO(),
+        date: effectiveTodayISO(),
         hours: Math.round(hours * 10) / 10,
         bedTime,
         wakeTime,

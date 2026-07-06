@@ -1,11 +1,13 @@
 import { AiError, generateJson, type ImageAttachment } from '@/lib/llm'
-import { todayISO } from '@/lib/dates'
+import { effectiveTodayISO } from '@/lib/dates'
 import type { FitnessProfile } from '@/modules/fitness/lib/types'
 import type { Meal, MealItem, MealType, NutritionTargets } from './types'
 
 /** When the user didn't name the meal, the clock does: 1:30 PM is lunch. */
 export function inferMealType(when: Date = new Date()): MealType {
   const hour = when.getHours()
+  // Past midnight is still last evening's eating, not breakfast
+  if (hour < 4) return 'dinner'
   if (hour < 11) return 'breakfast'
   if (hour < 15) return 'lunch'
   if (hour < 18) return 'snack'
@@ -79,7 +81,7 @@ Rules:
   const sum = (pick: (i: MealItem) => number | undefined) => items.reduce((s, i) => s + (pick(i) ?? 0), 0)
   return {
     id: crypto.randomUUID(),
-    date: todayISO(),
+    date: effectiveTodayISO(),
     createdAt: new Date().toISOString(),
     mealType: ['breakfast', 'lunch', 'snack', 'dinner'].includes(raw.mealType ?? '') ? raw.mealType : inferMealType(),
     description: input || 'photo meal',

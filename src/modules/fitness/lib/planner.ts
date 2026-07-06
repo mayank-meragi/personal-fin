@@ -1,5 +1,5 @@
 import { AiError, generateJson } from '@/lib/llm'
-import { todayISO } from '@/lib/dates'
+import { effectiveTodayISO } from '@/lib/dates'
 import { daysSince, formatSet, volumeByMuscle } from './stats'
 import { exerciseById } from './exerciseDb'
 import type { Exercise, FitnessProfile, SessionExercise, SetEntry, WorkoutSession } from './types'
@@ -117,7 +117,7 @@ export async function generateNextWorkout(opts: {
   body?: { weightKg?: number; lastNightSleepHours?: number }
 }): Promise<WorkoutSession> {
   const { profile, history, exercises } = opts
-  const today = todayISO()
+  const today = effectiveTodayISO()
   const recent = history.slice(-10)
   const byId = exerciseById(exercises)
   const candidates = candidateExercises(exercises, profile, recent)
@@ -328,7 +328,7 @@ Timed work uses minutes instead of reps: "ran 20 min" or "20 min treadmill" = on
   const now = new Date().toISOString()
   return {
     id: crypto.randomUUID(),
-    date: todayISO(),
+    date: effectiveTodayISO(),
     name: raw.name?.trim() || 'Logged workout',
     source: 'manual',
     startedAt: now,
@@ -373,7 +373,7 @@ export function findExercise(name: string, exercises: Exercise[]): Exercise | un
 
 /** Rewrite the fitness coach-memory after a session (fed into future plans). */
 export async function generateFitnessMemory(previous: string, recent: WorkoutSession[]): Promise<string> {
-  const today = todayISO()
+  const today = effectiveTodayISO()
   const text = await generateJson({
     text: `You keep a personal trainer's compact notes about a client, injected into future workout
 programming. Rewrite them to include the newest sessions. Under 150 words, plain "- " bullets.
