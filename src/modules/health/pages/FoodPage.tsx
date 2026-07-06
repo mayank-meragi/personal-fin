@@ -14,6 +14,7 @@ import { saveMeal, useMealsMonth, useMetrics, useTargets } from '../lib/data'
 import { inferMealType, parseMeal, suggestTargets } from '../lib/nutrition'
 import type { Meal, MealType } from '../lib/types'
 import { useHealthMutations } from '../lib/data'
+import MealEditDialog from '../components/MealEditDialog'
 
 const MEAL_ORDER: MealType[] = ['breakfast', 'lunch', 'snack', 'dinner']
 const MEAL_LABEL: Record<MealType, string> = { breakfast: 'Breakfast', lunch: 'Lunch', snack: 'Snacks', dinner: 'Dinner' }
@@ -63,6 +64,7 @@ export default function FoodPage() {
   const [calInput, setCalInput] = useState('')
   const [proteinInput, setProteinInput] = useState('')
   const [suggesting, setSuggesting] = useState(false)
+  const [editing, setEditing] = useState<Meal | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const todayMeals = meals.filter((m) => m.date === today)
@@ -226,10 +228,10 @@ export default function FoodPage() {
               {group.map((meal: Meal) => (
                 <Card key={meal.id}>
                   <CardContent className="flex items-start gap-3 py-3">
-                    <div className="min-w-0 flex-1">
+                    <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setEditing(meal)}>
                       <p className="text-sm font-semibold text-[var(--text-strong)]">{meal.description}</p>
                       <p className="text-xs text-muted-foreground">{meal.items.map((i) => i.name).join(' · ')}</p>
-                    </div>
+                    </button>
                     <div className="shrink-0 text-right">
                       <p className="font-mono text-sm font-bold tabular-nums">{meal.calories} kcal</p>
                       <p className="text-xs text-muted-foreground">{meal.proteinG}g protein</p>
@@ -252,6 +254,8 @@ export default function FoodPage() {
           <p className="py-6 text-center text-sm text-muted-foreground">Nothing logged today — type what you ate above.</p>
         )}
       </div>
+
+      <MealEditDialog meal={editing} onClose={() => setEditing(null)} />
 
       {/* Targets */}
       <Card>

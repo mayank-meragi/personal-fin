@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { todayISO } from '@/lib/dates'
 import { useHealthMutations, useSleep } from '../lib/data'
+import type { SleepEntry } from '../lib/types'
 
 export function computeHours(bedTime: string, wakeTime: string): number {
   const [bh, bm] = bedTime.split(':').map(Number)
@@ -29,6 +30,15 @@ export default function SleepPage() {
   const [bedTime, setBedTime] = useState('23:00')
   const [wakeTime, setWakeTime] = useState('07:00')
   const [quality, setQuality] = useState<number | undefined>()
+  const [editing, setEditing] = useState<SleepEntry | null>(null)
+
+  function startEdit(s: SleepEntry) {
+    setEditing(s)
+    setBedTime(s.bedTime ?? '23:00')
+    setWakeTime(s.wakeTime ?? '07:00')
+    setQuality(s.quality)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   const lastNight = sleep.find((s) => s.date === today)
   const last7 = sleep.slice(-7)
@@ -77,7 +87,13 @@ export default function SleepPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">{lastNight ? 'Update last night' : 'Log last night'}</CardTitle>
+          <CardTitle className="text-sm">
+            {editing
+              ? `Edit ${new Date(editing.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`
+              : lastNight
+                ? 'Update last night'
+                : 'Log last night'}
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap items-center gap-3">
@@ -118,22 +134,30 @@ export default function SleepPage() {
               </button>
             ))}
           </div>
-          <Button
-            size="sm"
-            onClick={() => {
-              addSleep({
-                id: crypto.randomUUID(),
-                date: today,
-                hours: computeHours(bedTime, wakeTime),
-                bedTime,
-                wakeTime,
-                quality,
-              })
-              setQuality(undefined)
-            }}
-          >
-            {lastNight ? 'Update' : 'Log sleep'}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              onClick={() => {
+                addSleep({
+                  id: editing?.id ?? crypto.randomUUID(),
+                  date: editing?.date ?? today,
+                  hours: computeHours(bedTime, wakeTime),
+                  bedTime,
+                  wakeTime,
+                  quality,
+                })
+                setQuality(undefined)
+                setEditing(null)
+              }}
+            >
+              {editing ? 'Save' : lastNight ? 'Update' : 'Log sleep'}
+            </Button>
+            {editing && (
+              <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>
+                Cancel
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -154,6 +178,14 @@ export default function SleepPage() {
                 </p>
               )}
               {s.quality && <p className="text-xs text-muted-foreground">{QUALITY[s.quality - 1]}</p>}
+              <button
+                type="button"
+                aria-label="Edit entry"
+                className="rounded-full p-1 text-muted-foreground hover:text-foreground"
+                onClick={() => startEdit(s)}
+              >
+                <Pencil className="size-3.5" />
+              </button>
               <button
                 type="button"
                 aria-label="Delete entry"

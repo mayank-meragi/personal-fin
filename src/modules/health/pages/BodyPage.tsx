@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Check, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { todayISO } from '@/lib/dates'
 import { useHealthMutations, useMetrics } from '../lib/data'
+import type { BodyMetric } from '../lib/types'
 
 /** Simple 30-day weight sparkline (SVG, no chart lib). */
 function WeightSpark({ points }: { points: { date: string; weightKg: number }[] }) {
@@ -31,6 +32,26 @@ export default function BodyPage() {
   const [weight, setWeight] = useState('')
   const [waist, setWaist] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editWeight, setEditWeight] = useState('')
+  const [editWaist, setEditWaist] = useState('')
+
+  function startEdit(m: BodyMetric) {
+    setEditingId(m.id)
+    setEditWeight(String(m.weightKg))
+    setEditWaist(m.waistCm != null ? String(m.waistCm) : '')
+  }
+
+  function commitEdit(m: BodyMetric) {
+    const w = Number(editWeight)
+    if (!Number.isFinite(w) || w <= 0) return
+    addMetric({
+      ...m,
+      weightKg: Math.round(w * 10) / 10,
+      waistCm: Number(editWaist) > 0 ? Math.round(Number(editWaist) * 10) / 10 : undefined,
+    })
+    setEditingId(null)
+  }
 
   const latest = metrics[metrics.length - 1]
   const previous = metrics[metrics.length - 2]
@@ -122,16 +143,59 @@ export default function BodyPage() {
               <p className="w-20 shrink-0 text-xs text-muted-foreground">
                 {new Date(m.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
               </p>
-              <p className="flex-1 font-mono text-sm font-bold tabular-nums">{m.weightKg} kg</p>
-              {m.waistCm && <p className="text-xs text-muted-foreground">waist {m.waistCm} cm</p>}
-              <button
-                type="button"
-                aria-label="Delete entry"
-                className="rounded-full p-1 text-muted-foreground hover:text-red-600"
-                onClick={() => removeMetric(m.id)}
-              >
-                <Trash2 className="size-3.5" />
-              </button>
+              {editingId === m.id ? (
+                <>
+                  <Input
+                    className="h-8 w-24 text-right tabular-nums"
+                    type="number"
+                    step="0.1"
+                    value={editWeight}
+                    autoFocus
+                    onChange={(e) => setEditWeight(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') commitEdit(m)
+                    }}
+                  />
+                  <Input
+                    className="h-8 w-20 text-right tabular-nums"
+                    type="number"
+                    step="0.5"
+                    placeholder="waist"
+                    value={editWaist}
+                    onChange={(e) => setEditWaist(e.target.value)}
+                  />
+                  <span className="flex-1" />
+                  <button
+                    type="button"
+                    aria-label="Save"
+                    className="rounded-full bg-[var(--emerald-600)] p-1.5 text-white"
+                    onClick={() => commitEdit(m)}
+                  >
+                    <Check className="size-3.5" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="flex-1 font-mono text-sm font-bold tabular-nums">{m.weightKg} kg</p>
+                  {m.waistCm && <p className="text-xs text-muted-foreground">waist {m.waistCm} cm</p>}
+                  <button
+                    type="button"
+                    aria-label="Edit entry"
+                    className="rounded-full p-1 text-muted-foreground hover:text-foreground"
+                    onClick={() => startEdit(m)}
+                  >
+                    <Pencil className="size-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Delete entry"
+                    className="rounded-full p-1 text-muted-foreground hover:text-red-600"
+                    onClick={() => removeMetric(m.id)}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </>
+              )}
             </div>
           ))}
         {metrics.length === 0 && (

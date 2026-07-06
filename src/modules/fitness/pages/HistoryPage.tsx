@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Trash2, Trophy } from 'lucide-react'
+import { Pencil, Trash2, Trophy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { todayISO } from '@/lib/dates'
@@ -8,6 +8,7 @@ import { exerciseById, useExercises } from '../lib/exerciseDb'
 import { deleteSession, useAllWorkouts } from '../lib/data'
 import { currentStreak, daysSince, formatSet, personalRecords, sessionVolume, setSummary, thisWeekCount, volumeByMuscle } from '../lib/stats'
 import type { WorkoutSession } from '../lib/types'
+import SessionEditDialog from '../components/SessionEditDialog'
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -18,7 +19,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   )
 }
 
-function SessionCard({ session, onDelete }: { session: WorkoutSession; onDelete: () => void }) {
+function SessionCard({ session, onEdit, onDelete }: { session: WorkoutSession; onEdit: () => void; onDelete: () => void }) {
   const volume = Math.round(sessionVolume(session))
   const duration =
     session.startedAt && session.endedAt
@@ -51,14 +52,24 @@ function SessionCard({ session, onDelete }: { session: WorkoutSession; onDelete:
           <p className="text-xs font-semibold text-muted-foreground">
             volume {volume.toLocaleString('en-IN')}kg
           </p>
-          <button
-            type="button"
-            aria-label="Delete session"
-            onClick={onDelete}
-            className="rounded-full p-1.5 text-muted-foreground hover:bg-[var(--surface-sunken)] hover:text-red-600"
-          >
-            <Trash2 className="size-3.5" />
-          </button>
+          <div className="flex gap-1">
+            <button
+              type="button"
+              aria-label="Edit session"
+              onClick={onEdit}
+              className="rounded-full p-1.5 text-muted-foreground hover:bg-[var(--surface-sunken)] hover:text-foreground"
+            >
+              <Pencil className="size-3.5" />
+            </button>
+            <button
+              type="button"
+              aria-label="Delete session"
+              onClick={onDelete}
+              className="rounded-full p-1.5 text-muted-foreground hover:bg-[var(--surface-sunken)] hover:text-red-600"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -70,6 +81,7 @@ export default function HistoryPage() {
   const { sessions } = useAllWorkouts()
   const { data: exercises } = useExercises()
   const [showAllPrs, setShowAllPrs] = useState(false)
+  const [editing, setEditing] = useState<WorkoutSession | null>(null)
   const today = todayISO()
   const newest = [...sessions].reverse()
   const prs = personalRecords(sessions)
@@ -142,6 +154,7 @@ export default function HistoryPage() {
           <SessionCard
             key={s.id}
             session={s}
+            onEdit={() => setEditing(s)}
             onDelete={() => {
               if (confirm(`Delete "${s.name}" from ${s.date}?`)) deleteSession(qc, s)
             }}
@@ -153,6 +166,8 @@ export default function HistoryPage() {
           </p>
         )}
       </div>
+
+      <SessionEditDialog session={editing} onClose={() => setEditing(null)} />
     </div>
   )
 }
