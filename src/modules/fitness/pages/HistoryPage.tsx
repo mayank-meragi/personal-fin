@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { todayISO } from '@/lib/dates'
 import { exerciseById, useExercises } from '../lib/exerciseDb'
 import { deleteSession, useAllWorkouts } from '../lib/data'
-import { currentStreak, daysSince, personalRecords, sessionVolume, setSummary, thisWeekCount, volumeByMuscle } from '../lib/stats'
+import { currentStreak, daysSince, formatSet, personalRecords, sessionVolume, setSummary, thisWeekCount, volumeByMuscle } from '../lib/stats'
 import type { WorkoutSession } from '../lib/types'
 
 function Stat({ label, value }: { label: string; value: string }) {
@@ -41,9 +41,7 @@ function SessionCard({ session, onDelete }: { session: WorkoutSession; onDelete:
               <p key={i} className="flex justify-between gap-2 text-xs text-muted-foreground">
                 <span className="truncate">{ex.name}</span>
                 <span className="shrink-0 font-mono tabular-nums">
-                  {done.length > 0
-                    ? done.map((s) => `${s.reps ?? s.targetReps}${s.weight ? `@${s.weight}` : ''}`).join(' ')
-                    : `skipped ${setSummary(ex.sets)}`}
+                  {done.length > 0 ? done.map(formatSet).join(' ') : `skipped ${setSummary(ex.sets)}`}
                 </span>
               </p>
             )

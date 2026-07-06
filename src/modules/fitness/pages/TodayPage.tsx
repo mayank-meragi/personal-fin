@@ -13,7 +13,7 @@ import { updateFile } from '@/lib/sync'
 import { exerciseById, useExercises } from '../lib/exerciseDb'
 import { saveSession, savePlan, useAllWorkouts, usePlan } from '../lib/data'
 import { generateFitnessMemory, parseQuickLog } from '../lib/planner'
-import { sessionVolume, setSummary } from '../lib/stats'
+import { exerciseMode, sessionVolume, setSummary } from '../lib/stats'
 import type { Exercise, FitnessMemoryFile, SessionExercise, WorkoutSession } from '../lib/types'
 import { ExerciseThumb } from '../components/ExerciseImage'
 import ExerciseDetail from '../components/ExerciseDetail'
@@ -65,8 +65,12 @@ export default function TodayPage() {
       const target = w.exercises[exIndex].sets[setIndex]
       target.done = !target.done
       if (target.done) {
-        target.reps = target.reps ?? target.targetReps
-        target.weight = target.weight ?? target.targetWeight
+        if (target.targetDurationSec && !target.targetReps) {
+          target.durationSec = target.durationSec ?? target.targetDurationSec
+        } else {
+          target.reps = target.reps ?? target.targetReps
+          target.weight = target.weight ?? target.targetWeight
+        }
       }
       if (!w.startedAt) w.startedAt = new Date().toISOString()
       return w
@@ -81,6 +85,17 @@ export default function TodayPage() {
       const target = w.exercises[exIndex].sets[setIndex]
       const n = Number(value)
       target[field] = Number.isFinite(n) && n > 0 ? n : undefined
+      return w
+    })
+  }
+
+  function editDuration(exIndex: number, setIndex: number, minutes: string) {
+    updateWorkout((w) => {
+      const target = w.exercises[exIndex].sets[setIndex]
+      const n = Number(minutes)
+      const sec = Number.isFinite(n) && n > 0 ? Math.round(n * 60) : undefined
+      target.durationSec = sec
+      if (!target.done && sec) target.targetDurationSec = sec
       return w
     })
   }
@@ -167,7 +182,9 @@ export default function TodayPage() {
             </CardContent>
           </Card>
 
-          {workout.exercises.map((ex, exIndex) => (
+          {workout.exercises.map((ex, exIndex) => {
+            const timed = exerciseMode(ex, byId.get(ex.exerciseId)) === 'duration'
+            return (
             <Card key={`${ex.exerciseId}-${exIndex}`}>
               <CardContent className="space-y-2 py-3">
                 <div className="flex items-center gap-2.5">
@@ -177,7 +194,8 @@ export default function TodayPage() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-[var(--text-strong)]">{ex.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {setSummary(ex.sets)} · rest {ex.restSeconds ?? 90}s
+                      {setSummary(ex.sets)}
+                      {timed ? '' : ` · rest ${ex.restSeconds ?? 90}s`}
                     </p>
                   </div>
                   <button
@@ -199,26 +217,46 @@ export default function TodayPage() {
                       )}
                     >
                       <span className="w-5 text-center text-xs font-bold text-muted-foreground">{setIndex + 1}</span>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        className="w-14 rounded-md bg-white/70 px-1.5 py-1 text-center font-mono text-sm tabular-nums outline-none"
-                        value={set.done ? (set.reps ?? '') : (set.reps ?? set.targetReps)}
-                        onChange={(e) => editSet(exIndex, setIndex, 'reps', e.target.value)}
-                        aria-label="reps"
-                      />
-                      <span className="text-xs text-muted-foreground">reps</span>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        step="0.5"
-                        className="w-16 rounded-md bg-white/70 px-1.5 py-1 text-center font-mono text-sm tabular-nums outline-none"
-                        value={set.done ? (set.weight ?? '') : (set.weight ?? set.targetWeight ?? '')}
-                        placeholder="bw"
-                        onChange={(e) => editSet(exIndex, setIndex, 'weight', e.target.value)}
-                        aria-label="weight"
-                      />
-                      <span className="flex-1 text-xs text-muted-foreground">kg</span>
+                      {timed ? (
+                        <>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            step="0.5"
+                            className="w-16 rounded-md bg-white/70 px-1.5 py-1 text-center font-mono text-sm tabular-nums outline-none"
+                            value={(() => {
+                              const sec = set.durationSec ?? set.targetDurationSec
+                              return sec ? Math.round((sec / 60) * 10) / 10 : ''
+                            })()}
+                            onChange={(e) => editDuration(exIndex, setIndex, e.target.value)}
+                            aria-label="minutes"
+                          />
+                          <span className="flex-1 text-xs text-muted-foreground">min</span>
+                        </>
+                      ) : (
+                        <>
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            className="w-14 rounded-md bg-white/70 px-1.5 py-1 text-center font-mono text-sm tabular-nums outline-none"
+                            value={set.done ? (set.reps ?? '') : (set.reps ?? set.targetReps)}
+                            onChange={(e) => editSet(exIndex, setIndex, 'reps', e.target.value)}
+                            aria-label="reps"
+                          />
+                          <span className="text-xs text-muted-foreground">reps</span>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            step="0.5"
+                            className="w-16 rounded-md bg-white/70 px-1.5 py-1 text-center font-mono text-sm tabular-nums outline-none"
+                            value={set.done ? (set.weight ?? '') : (set.weight ?? set.targetWeight ?? '')}
+                            placeholder="bw"
+                            onChange={(e) => editSet(exIndex, setIndex, 'weight', e.target.value)}
+                            aria-label="weight"
+                          />
+                          <span className="flex-1 text-xs text-muted-foreground">kg</span>
+                        </>
+                      )}
                       <button
                         type="button"
                         aria-label={set.done ? 'Mark set not done' : 'Mark set done'}
@@ -237,7 +275,8 @@ export default function TodayPage() {
                 </div>
               </CardContent>
             </Card>
-          ))}
+            )
+          })}
 
           <div className="flex gap-2">
             <Button variant="outline" className="flex-1" onClick={() => setPickerOpen(true)}>
@@ -300,16 +339,32 @@ export default function TodayPage() {
         muscles={workout?.focus}
         onPick={(e) => {
           setPickerOpen(false)
-          const entry: SessionExercise = {
-            exerciseId: e.id,
-            name: e.name,
-            restSeconds: 90,
-            sets: [
-              { targetReps: 10, done: false },
-              { targetReps: 10, done: false },
-              { targetReps: 10, done: false },
-            ],
-          }
+          const timed = e.category === 'cardio' || e.category === 'stretching'
+          const entry: SessionExercise = timed
+            ? {
+                exerciseId: e.id,
+                name: e.name,
+                mode: 'duration',
+                restSeconds: 30,
+                sets:
+                  e.category === 'cardio'
+                    ? [{ targetReps: 0, targetDurationSec: 600, done: false }]
+                    : [
+                        { targetReps: 0, targetDurationSec: 30, done: false },
+                        { targetReps: 0, targetDurationSec: 30, done: false },
+                      ],
+              }
+            : {
+                exerciseId: e.id,
+                name: e.name,
+                mode: 'reps',
+                restSeconds: 90,
+                sets: [
+                  { targetReps: 10, done: false },
+                  { targetReps: 10, done: false },
+                  { targetReps: 10, done: false },
+                ],
+              }
           updateWorkout((w) => ({ ...w, exercises: [...w.exercises, entry] }))
         }}
         onClose={() => setPickerOpen(false)}

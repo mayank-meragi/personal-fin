@@ -1,4 +1,25 @@
-import type { Exercise, WorkoutSession } from './types'
+import type { Exercise, SessionExercise, SetEntry, WorkoutSession } from './types'
+
+/** How an exercise is tracked: stored mode wins, else the library category decides. */
+export function exerciseMode(ex: SessionExercise, library?: Exercise): 'reps' | 'duration' {
+  if (ex.mode) return ex.mode
+  if (library && (library.category === 'cardio' || library.category === 'stretching')) return 'duration'
+  if (ex.sets.some((s) => s.targetDurationSec != null || s.durationSec != null)) return 'duration'
+  return 'reps'
+}
+
+export function formatDuration(seconds: number): string {
+  return seconds >= 90 ? `${Math.round(seconds / 60)} min` : `${Math.round(seconds)}s`
+}
+
+/** One completed set as text: "8@60", "12", or "20 min". */
+export function formatSet(set: SetEntry): string {
+  const duration = set.durationSec ?? set.targetDurationSec
+  if (duration && duration > 0 && !(set.reps ?? set.targetReps)) return formatDuration(duration)
+  const reps = set.reps ?? set.targetReps
+  const weight = set.weight ?? set.targetWeight
+  return weight ? `${reps}@${weight}` : String(reps)
+}
 
 /** Estimated one-rep max (Epley). */
 export function e1rm(weight: number, reps: number): number {
@@ -131,10 +152,16 @@ export function volumeByMuscle(
     .sort((a, b) => b.sets - a.sets)
 }
 
-/** "3×8@60kg" style summary of an exercise's set scheme. */
-export function setSummary(sets: { targetReps: number; targetWeight?: number }[]): string {
+/** "3×8@60kg", "20 min", or "3×30s" style summary of an exercise's set scheme. */
+export function setSummary(sets: { targetReps: number; targetWeight?: number; targetDurationSec?: number }[]): string {
   if (sets.length === 0) return ''
   const first = sets[0]
+  if (first.targetDurationSec && !first.targetReps) {
+    const uniform = sets.every((s) => s.targetDurationSec === first.targetDurationSec)
+    if (sets.length === 1) return formatDuration(first.targetDurationSec)
+    if (uniform) return `${sets.length}× ${formatDuration(first.targetDurationSec)}`
+    return sets.map((s) => formatDuration(s.targetDurationSec ?? 0)).join(', ')
+  }
   const uniform = sets.every((s) => s.targetReps === first.targetReps && s.targetWeight === first.targetWeight)
   const weight = first.targetWeight ? `@${first.targetWeight}kg` : ''
   if (uniform) return `${sets.length}×${first.targetReps}${weight}`

@@ -14,7 +14,7 @@ import type { ToolDef } from '../llm'
 import { fetchExercises } from '@/modules/fitness/lib/exerciseDb'
 import { deleteSession, savePlan, saveSession } from '@/modules/fitness/lib/data'
 import { generateNextWorkout, parseQuickLog } from '@/modules/fitness/lib/planner'
-import { sessionVolume, setSummary } from '@/modules/fitness/lib/stats'
+import { formatSet, sessionVolume, setSummary } from '@/modules/fitness/lib/stats'
 import type { FitnessProfile, PlanFile, WorkoutSession } from '@/modules/fitness/lib/types'
 import type {
   Account,
@@ -593,7 +593,7 @@ export async function executeTool(name: string, args: Args, ctx: ToolContext): P
           volumeKg: Math.round(sessionVolume(s)),
           exercises: s.exercises.map((e) => ({
             name: e.name,
-            sets: e.sets.map((x) => (x.done ? `${x.reps ?? x.targetReps}@${x.weight ?? x.targetWeight ?? 'bw'}` : 'skipped')),
+            sets: e.sets.map((x) => (x.done ? formatSet(x) : 'skipped')),
           })),
         })),
       }

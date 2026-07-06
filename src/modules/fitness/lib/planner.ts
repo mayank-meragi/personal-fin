@@ -1,6 +1,6 @@
 import { AiError, generateJson } from '@/lib/llm'
 import { todayISO } from '@/lib/dates'
-import { daysSince, volumeByMuscle } from './stats'
+import { daysSince, formatSet, volumeByMuscle } from './stats'
 import { exerciseById } from './exerciseDb'
 import type { Exercise, FitnessProfile, SessionExercise, SetEntry, WorkoutSession } from './types'
 
@@ -32,9 +32,8 @@ function candidateExercises(
   }
   const rank = (e: Exercise) =>
     (e.mechanic === 'compound' ? 0 : 2) + (e.level === 'beginner' ? 0 : e.level === 'intermediate' ? 1 : 3)
-  const eligible = exercises
-    .filter((e) => e.category === 'strength' && (!e.equipment || equipment.has(e.equipment)) && !picked.has(e.id))
-    .sort((a, b) => rank(a) - rank(b))
+  const usable = (e: Exercise) => (!e.equipment || equipment.has(e.equipment)) && !picked.has(e.id)
+  const eligible = exercises.filter((e) => e.category === 'strength' && usable(e)).sort((a, b) => rank(a) - rank(b))
   // Spread across muscles so no group is starved out of the list
   const perMuscle = new Map<string, number>()
   for (const e of eligible) {
@@ -45,6 +44,13 @@ function candidateExercises(
     perMuscle.set(muscle, count + 1)
     picked.set(e.id, e)
   }
+  // Cardio + stretching so the model can program warm-ups, finishers, cool-downs
+  for (const e of exercises.filter((e) => e.category === 'cardio' && usable(e)).sort((a, b) => rank(a) - rank(b)).slice(0, 10)) {
+    picked.set(e.id, e)
+  }
+  for (const e of exercises.filter((e) => e.category === 'stretching' && usable(e)).sort((a, b) => rank(a) - rank(b)).slice(0, 8)) {
+    picked.set(e.id, e)
+  }
   return [...picked.values()]
 }
 
@@ -53,7 +59,7 @@ function sessionLine(s: WorkoutSession, today: string): string {
     .map((ex) => {
       const doneSets = ex.sets.filter((x) => x.done)
       const skipped = ex.sets.length - doneSets.length
-      const actual = doneSets.map((x) => `${x.reps ?? x.targetReps}@${x.weight ?? x.targetWeight ?? 0}`).join(',')
+      const actual = doneSets.map(formatSet).join(',')
       return `${ex.name} [${actual || 'all skipped'}${skipped > 0 ? ` +${skipped} skipped` : ''}]`
     })
     .join('; ')
@@ -78,10 +84,13 @@ const PLAN_SCHEMA = {
             items: {
               type: 'object',
               properties: {
-                targetReps: { type: 'number' },
+                targetReps: { type: 'number', description: 'for strength sets; omit for timed work' },
                 targetWeight: { type: 'number', description: 'kg; omit for bodyweight' },
+                targetDurationSec: {
+                  type: 'number',
+                  description: 'for cardio/stretching: duration in seconds (e.g. 900 = 15 min run, 30 = stretch hold); omit for rep-based sets',
+                },
               },
-              required: ['targetReps'],
             },
           },
         },
@@ -143,6 +152,10 @@ Programming rules:
 - Respect 48-72h recovery per muscle group based on the sessions above.
 - 4-6 exercises: compounds first, isolation after. 2-4 sets each. Rest 60-90s (isolation) to 120-180s (heavy compounds), as restSeconds per exercise.
 - Weights in kg. For a brand-new exercise pick a conservative starting weight for their experience level, or omit targetWeight for bodyweight movements.
+- CARDIO and STRETCHING are timed, never reps: give those sets targetDurationSec only
+  (cardio usually ONE set of 600-1800s; stretch holds 20-45s), and set restSeconds low.
+  Use them where they serve the goal — a cardio finisher for fat-loss, a short stretch
+  cool-down after heavy leg work. Strength sets get targetReps and never targetDurationSec.
 - Use ONLY exerciseId values from this list:
 ${candidates.map((e) => `${e.id} | ${e.name} | ${e.primaryMuscles.join('/')} | ${e.equipment ?? 'body only'}${e.mechanic ? ` | ${e.mechanic}` : ''}`).join('\n')}`
 
@@ -175,19 +188,39 @@ ${candidates.map((e) => `${e.id} | ${e.name} | ${e.primaryMuscles.join('/')} | $
       nameIndex.get(item.exerciseId.replace(/[_-]/g, ' ').toLowerCase()) ??
       exercises.find((e) => e.id.toLowerCase() === item.exerciseId!.toLowerCase())
     if (!ex) continue
+    const timedExercise = ex.category === 'cardio' || ex.category === 'stretching'
     const sets: SetEntry[] = item.sets
-      .filter((s) => Number.isFinite(s.targetReps) && (s.targetReps ?? 0) > 0)
+      .filter(
+        (s: { targetReps?: number; targetDurationSec?: number }) =>
+          (Number.isFinite(s.targetReps) && (s.targetReps ?? 0) > 0) ||
+          (Number.isFinite(s.targetDurationSec) && (s.targetDurationSec ?? 0) > 0),
+      )
       .slice(0, 6)
-      .map((s) => ({
-        targetReps: Math.round(s.targetReps!),
-        targetWeight: Number.isFinite(s.targetWeight) && s.targetWeight! > 0 ? s.targetWeight : undefined,
-        done: false,
-      }))
+      .map((s: { targetReps?: number; targetWeight?: number; targetDurationSec?: number }) => {
+        const duration =
+          Number.isFinite(s.targetDurationSec) && s.targetDurationSec! > 0
+            ? Math.min(Math.round(s.targetDurationSec!), 3600)
+            : undefined
+        // A timed exercise mislabeled with reps: treat the number as minutes-ish? No —
+        // fall back to a sane default hold/run instead of pretending reps make sense.
+        if (timedExercise && !duration) {
+          return { targetReps: 0, targetDurationSec: ex.category === 'cardio' ? 600 : 30, done: false }
+        }
+        if (duration && (!s.targetReps || timedExercise)) {
+          return { targetReps: 0, targetDurationSec: duration, done: false }
+        }
+        return {
+          targetReps: Math.round(s.targetReps!),
+          targetWeight: Number.isFinite(s.targetWeight) && s.targetWeight! > 0 ? s.targetWeight : undefined,
+          done: false,
+        }
+      })
     if (sets.length === 0) continue
     sessionExercises.push({
       exerciseId: ex.id,
       name: ex.name,
-      restSeconds: Number.isFinite(item.restSeconds) ? Math.min(Math.max(item.restSeconds!, 30), 300) : 90,
+      mode: timedExercise || sets.every((s) => s.targetDurationSec) ? 'duration' : 'reps',
+      restSeconds: Number.isFinite(item.restSeconds) ? Math.min(Math.max(item.restSeconds!, 15), 300) : 90,
       sets,
     })
   }
@@ -218,8 +251,11 @@ const QUICK_LOG_SCHEMA = {
             type: 'array',
             items: {
               type: 'object',
-              properties: { reps: { type: 'number' }, weight: { type: 'number', description: 'kg; omit if bodyweight' } },
-              required: ['reps'],
+              properties: {
+                reps: { type: 'number', description: 'omit for timed work' },
+                weight: { type: 'number', description: 'kg; omit if bodyweight' },
+                minutes: { type: 'number', description: 'duration for cardio/stretch entries ("ran 20 min" = one set, minutes 20)' },
+              },
             },
           },
         },
@@ -234,13 +270,18 @@ const QUICK_LOG_SCHEMA = {
 export async function parseQuickLog(input: string, exercises: Exercise[]): Promise<WorkoutSession> {
   const text = await generateJson({
     system: `You parse informal gym-log notes into structured sets. "3x8 60" means 3 sets of 8 reps at 60kg.
-"3x8,8,6" means three sets with different reps. A bare weight applies to all sets. Weights are kg unless stated.`,
+"3x8,8,6" means three sets with different reps. A bare weight applies to all sets. Weights are kg unless stated.
+Timed work uses minutes instead of reps: "ran 20 min" or "20 min treadmill" = one set with minutes 20;
+"plank 3x1min" = three sets with minutes 1.`,
     text: input,
     schema: QUICK_LOG_SCHEMA,
     temperature: 0,
     maxOutputTokens: 2048,
   })
-  let raw: { name?: string; exercises?: { exercise?: string; sets?: { reps?: number; weight?: number }[] }[] }
+  let raw: {
+    name?: string
+    exercises?: { exercise?: string; sets?: { reps?: number; weight?: number; minutes?: number }[] }[]
+  }
   try {
     raw = JSON.parse(text)
   } catch {
@@ -252,18 +293,25 @@ export async function parseQuickLog(input: string, exercises: Exercise[]): Promi
     if (!item.exercise || !Array.isArray(item.sets) || item.sets.length === 0) continue
     const match = findExercise(item.exercise, exercises)
     const sets: SetEntry[] = item.sets
-      .filter((s) => Number.isFinite(s.reps) && (s.reps ?? 0) > 0)
-      .map((s) => ({
-        targetReps: Math.round(s.reps!),
-        targetWeight: Number.isFinite(s.weight) && s.weight! > 0 ? s.weight : undefined,
-        reps: Math.round(s.reps!),
-        weight: Number.isFinite(s.weight) && s.weight! > 0 ? s.weight : undefined,
-        done: true,
-      }))
+      .filter((s) => (Number.isFinite(s.reps) && (s.reps ?? 0) > 0) || (Number.isFinite(s.minutes) && (s.minutes ?? 0) > 0))
+      .map((s) => {
+        if (s.minutes && (!s.reps || s.reps <= 0)) {
+          const durationSec = Math.min(Math.round(s.minutes * 60), 3 * 3600)
+          return { targetReps: 0, targetDurationSec: durationSec, durationSec, done: true }
+        }
+        return {
+          targetReps: Math.round(s.reps!),
+          targetWeight: Number.isFinite(s.weight) && s.weight! > 0 ? s.weight : undefined,
+          reps: Math.round(s.reps!),
+          weight: Number.isFinite(s.weight) && s.weight! > 0 ? s.weight : undefined,
+          done: true,
+        }
+      })
     if (sets.length === 0) continue
     sessionExercises.push({
       exerciseId: match?.id ?? item.exercise.toLowerCase().replace(/\s+/g, '-'),
       name: match?.name ?? item.exercise,
+      mode: sets.every((s) => s.targetDurationSec) ? 'duration' : 'reps',
       sets,
     })
   }
@@ -286,6 +334,12 @@ export function findExercise(name: string, exercises: Exercise[]): Exercise | un
   const q = name.trim().toLowerCase()
   if (!q) return undefined
   const ALIASES: Record<string, string> = {
+    run: 'running, treadmill',
+    ran: 'running, treadmill',
+    running: 'running, treadmill',
+    treadmill: 'running, treadmill',
+    cycling: 'bicycling',
+    cycle: 'bicycling',
     bench: 'barbell bench press - medium grip',
     'bench press': 'barbell bench press - medium grip',
     squat: 'barbell squat',

@@ -14,12 +14,16 @@ export interface Exercise {
 }
 
 export interface SetEntry {
+  /** reps-mode target; 0 for duration-mode sets */
   targetReps: number
   /** kg; absent = bodyweight */
   targetWeight?: number
+  /** duration-mode target (cardio, stretches), in seconds */
+  targetDurationSec?: number
   /** actuals — filled when the set is checked off (default to targets) */
   reps?: number
   weight?: number
+  durationSec?: number
   done: boolean
 }
 
@@ -27,6 +31,8 @@ export interface SessionExercise {
   /** free-exercise-db id */
   exerciseId: string
   name: string
+  /** reps×weight (strength) vs timed (cardio/stretching); derived from the library when absent */
+  mode?: 'reps' | 'duration'
   restSeconds?: number
   sets: SetEntry[]
   notes?: string
