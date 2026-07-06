@@ -9,7 +9,6 @@ import {
   ImagePlus,
   Moon,
   Pencil,
-  Plus,
   Soup,
   Sparkles,
   Sunrise,
@@ -134,8 +133,7 @@ export default function FoodPage() {
   const [suggesting, setSuggesting] = useState(false)
   const [editing, setEditing] = useState<Meal | null>(null)
   const [moreNutrients, setMoreNutrients] = useState(false)
-  const [collapsed, setCollapsed] = useState<Set<MealType>>(new Set())
-  const [pendingMealType, setPendingMealType] = useState<MealType | null>(null)
+  const [collapsed, setCollapsed] = useState<Set<MealType>>(new Set(MEAL_ORDER))
   const fileInputRef = useRef<HTMLInputElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -161,13 +159,10 @@ export default function FoodPage() {
     setNotice(null)
     try {
       const meal = await parseMeal(input, image ? { mimeType: image.mimeType, data: image.data } : undefined)
-      // "Add more food" on a section pins the meal there, whatever the clock says
-      if (pendingMealType) meal.mealType = pendingMealType
       saveMeal(qc, meal)
       setText('')
       if (image) URL.revokeObjectURL(image.previewUrl)
       setImage(null)
-      setPendingMealType(null)
       setNotice(`Logged ${meal.calories} kcal · ${meal.proteinG}g protein.`)
     } catch (e) {
       setNotice(
@@ -199,11 +194,6 @@ export default function FoodPage() {
     } finally {
       setSuggesting(false)
     }
-  }
-
-  function addTo(type: MealType) {
-    setPendingMealType(type)
-    inputRef.current?.focus()
   }
 
   return (
@@ -340,14 +330,6 @@ export default function FoodPage() {
             }}
           />
         </div>
-        {pendingMealType && (
-          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            Adding to <span className="font-semibold text-[var(--text-strong)]">{MEAL_META[pendingMealType].label}</span>
-            <button type="button" aria-label="Cancel" onClick={() => setPendingMealType(null)}>
-              <X className="size-3" />
-            </button>
-          </p>
-        )}
         {image && (
           <div className="flex items-center gap-2">
             <img src={image.previewUrl} alt="Food" className="h-12 w-12 rounded-lg object-cover ring-1 ring-border" />
@@ -426,13 +408,6 @@ export default function FoodPage() {
                     </CardContent>
                   </Card>
                 ))}
-                <button
-                  type="button"
-                  onClick={() => addTo(type)}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-[var(--radius-lg)] border border-dashed border-[var(--border-default)] py-2.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
-                >
-                  <Plus className="size-3.5" /> Add {group.length > 0 ? 'more ' : ''}food
-                </button>
               </>
             )}
           </section>
