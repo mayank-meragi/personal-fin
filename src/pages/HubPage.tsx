@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { ArrowLeftRight, Dumbbell } from 'lucide-react'
+import BriefingCard from '@/components/BriefingCard'
 import QuickEntry from '@/modules/finance/components/QuickEntry'
 import HealthCard from '@/modules/health/components/HealthCard'
 import { Amount } from '@/components/Amount'
@@ -120,6 +121,8 @@ export default function HubPage() {
           {(name?.[0] ?? '₹').toUpperCase()}
         </span>
       </div>
+
+      <BriefingCard />
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 gap-3">
