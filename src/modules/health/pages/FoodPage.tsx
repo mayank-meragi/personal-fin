@@ -96,7 +96,7 @@ function MacroRow({
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex items-baseline justify-between gap-2">
           <span className="text-sm font-semibold text-[var(--text-strong)]">{label}</span>
-          <span className="font-mono text-sm font-bold tabular-nums">
+          <span className="font-mono text-sm font-bold whitespace-nowrap tabular-nums">
             {Math.round(value)}
             {target ? <span className="text-xs font-medium text-muted-foreground"> / {target}{unit}</span> : unit}
           </span>
