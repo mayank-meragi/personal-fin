@@ -1,4 +1,4 @@
-import { Download, IndianRupee, LayoutDashboard, ReceiptText, Target } from 'lucide-react'
+import { CreditCard, Download, LayoutDashboard, ReceiptText, Target } from 'lucide-react'
 import { useAccounts } from '@/hooks/useData'
 import { useAllTransactions } from '@/hooks/useTransactions'
 import { useCategories } from '@/hooks/useData'
@@ -41,7 +41,7 @@ function FinanceCard() {
 export const financeModule: ModuleDef = {
   id: 'finance',
   name: 'Finance',
-  icon: IndianRupee,
+  icon: CreditCard,
   tagline: 'Money, budgets & accounts',
   routes: [
     { path: '/finance', element: DashboardPage },

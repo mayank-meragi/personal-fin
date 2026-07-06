@@ -72,6 +72,39 @@ export function personalRecords(sessions: WorkoutSession[]): PersonalRecord[] {
   return [...best.values()].sort((a, b) => b.e1rm - a.e1rm)
 }
 
+/**
+ * Did this session set a new best e1RM on any exercise the user had done
+ * before? (First-ever exposure to an exercise doesn't count as a PR.)
+ */
+export function isSessionPR(session: WorkoutSession, all: WorkoutSession[]): boolean {
+  const earlier = all.filter((s) => s.date < session.date)
+  if (earlier.length === 0) return false
+  const priorBest = new Map<string, number>()
+  for (const s of earlier) {
+    for (const ex of s.exercises) {
+      for (const set of ex.sets) {
+        if (!set.done) continue
+        const weight = set.weight ?? set.targetWeight ?? 0
+        const reps = set.reps ?? set.targetReps
+        if (weight <= 0 || reps <= 0) continue
+        const score = e1rm(weight, reps)
+        if (score > (priorBest.get(ex.exerciseId) ?? 0)) priorBest.set(ex.exerciseId, score)
+      }
+    }
+  }
+  for (const ex of session.exercises) {
+    const best = priorBest.get(ex.exerciseId)
+    if (best === undefined) continue
+    for (const set of ex.sets) {
+      if (!set.done) continue
+      const weight = set.weight ?? set.targetWeight ?? 0
+      const reps = set.reps ?? set.targetReps
+      if (weight > 0 && reps > 0 && e1rm(weight, reps) > best) return true
+    }
+  }
+  return false
+}
+
 /** Completed-set volume per primary muscle over the given sessions. */
 export function volumeByMuscle(
   sessions: WorkoutSession[],

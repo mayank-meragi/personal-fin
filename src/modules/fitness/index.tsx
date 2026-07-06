@@ -1,4 +1,4 @@
-import { CalendarDays, ClipboardList, Dumbbell, LibraryBig, Zap } from 'lucide-react'
+import { CalendarDays, ClipboardList, Dumbbell, LibraryBig } from 'lucide-react'
 import type { ModuleDef } from '../types'
 import TodayPage from './pages/TodayPage'
 import ExercisesPage from './pages/ExercisesPage'
@@ -9,7 +9,7 @@ import FitnessCard from './components/FitnessCard'
 export const fitnessModule: ModuleDef = {
   id: 'fitness',
   name: 'Fitness',
-  icon: Zap,
+  icon: Dumbbell,
   tagline: 'Workouts, exercises & progress',
   routes: [
     { path: '/fitness', element: TodayPage },
