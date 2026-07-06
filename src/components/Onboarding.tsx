@@ -5,7 +5,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { getConfig, setConfig } from '../lib/cache'
 import { validateToken } from '../lib/github'
+import { keyConfigFor, PROVIDER_LABEL, PROVIDERS, type Provider } from '../lib/llm'
 import { ensureSeedFiles } from '../lib/sync'
+
+const KEY_HELP: Record<Provider, { label: string; href: string }> = {
+  gemini: { label: 'aistudio.google.com/apikey (free)', href: 'https://aistudio.google.com/apikey' },
+  openai: { label: 'platform.openai.com/api-keys', href: 'https://platform.openai.com/api-keys' },
+  anthropic: { label: 'console.anthropic.com', href: 'https://console.anthropic.com/settings/keys' },
+}
 
 interface Props {
   expired?: boolean
@@ -16,7 +23,8 @@ export default function Onboarding({ expired, onDone }: Props) {
   const [repo, setRepo] = useState(getConfig('dataRepo') ?? '')
   const [branch, setBranch] = useState(getConfig('dataBranch') ?? 'main')
   const [token, setToken] = useState('')
-  const [geminiKey, setGeminiKey] = useState(getConfig('geminiKey') ?? '')
+  const [provider, setProvider] = useState<Provider>('gemini')
+  const [aiKey, setAiKey] = useState(getConfig('geminiKey') ?? '')
   const [checking, setChecking] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -36,7 +44,8 @@ export default function Onboarding({ expired, onDone }: Props) {
       setConfig('dataRepo', repo.trim())
       setConfig('dataBranch', branch.trim())
       setConfig('githubToken', token.trim())
-      setConfig('geminiKey', geminiKey.trim() || null)
+      setConfig('aiProvider', provider === 'gemini' ? null : provider)
+      setConfig(keyConfigFor(provider), aiKey.trim() || null)
       await ensureSeedFiles()
       onDone()
     } finally {
@@ -108,25 +117,38 @@ export default function Onboarding({ expired, onDone }: Props) {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="ob-gemini">Gemini API key (optional — enables AI quick entry)</Label>
-            <Input
-              id="ob-gemini"
-              type="password"
-              placeholder="AIza…"
-              value={geminiKey}
-              onChange={(e) => setGeminiKey(e.target.value)}
-            />
+            <Label htmlFor="ob-ai">AI key (optional — enables AI quick entry and the assistant)</Label>
+            <div className="flex gap-2">
+              <select
+                className="h-9 rounded-md border border-input bg-background px-2 text-sm shadow-xs"
+                value={provider}
+                onChange={(e) => setProvider(e.target.value as Provider)}
+              >
+                {PROVIDERS.map((p) => (
+                  <option key={p} value={p}>
+                    {PROVIDER_LABEL[p]}
+                  </option>
+                ))}
+              </select>
+              <Input
+                id="ob-ai"
+                type="password"
+                placeholder={provider === 'gemini' ? 'AIza…' : provider === 'openai' ? 'sk-…' : 'sk-ant-…'}
+                value={aiKey}
+                onChange={(e) => setAiKey(e.target.value)}
+              />
+            </div>
             <p className="text-xs text-muted-foreground">
-              Get one free at{' '}
+              Get a key at{' '}
               <a
                 className="text-primary underline underline-offset-4"
-                href="https://aistudio.google.com/apikey"
+                href={KEY_HELP[provider].href}
                 target="_blank"
                 rel="noreferrer"
               >
-                aistudio.google.com/apikey
+                {KEY_HELP[provider].label}
               </a>
-              . Without it, quick entry falls back to simple pattern matching.
+              . Without one, quick entry falls back to simple pattern matching.
             </p>
           </div>
           {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}

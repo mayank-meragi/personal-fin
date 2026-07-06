@@ -11,13 +11,36 @@ import { useSyncState } from '../hooks/useSyncState'
 import { makeAccountId, useAccounts, useCategories, useFileQuery } from '../hooks/useData'
 import { accountTypeEmoji, accountTypeLabel } from '../lib/accounts'
 import { AI_MEMORY_PATH, emptyAiMemory, type AiMemoryFile } from '../lib/aiMemory'
+import {
+  activeProvider,
+  DEFAULT_MODEL,
+  keyConfigFor,
+  modelConfigFor,
+  PROVIDER_LABEL,
+  PROVIDERS,
+  type Provider,
+} from '../lib/llm'
 import type { AccountType } from '../lib/types'
+
+const KEY_PLACEHOLDER: Record<Provider, string> = {
+  gemini: 'AIza…',
+  openai: 'sk-…',
+  anthropic: 'sk-ant-…',
+}
+
+const KEY_URL: Record<Provider, { label: string; href: string }> = {
+  gemini: { label: 'aistudio.google.com/apikey', href: 'https://aistudio.google.com/apikey' },
+  openai: { label: 'platform.openai.com/api-keys', href: 'https://platform.openai.com/api-keys' },
+  anthropic: { label: 'console.anthropic.com', href: 'https://console.anthropic.com/settings/keys' },
+}
 
 export default function SettingsPage() {
   const queryClient = useQueryClient()
   const sync = useSyncState()
   const { accounts, addAccounts, updateAccount } = useAccounts()
-  const [geminiKey, setGeminiKey] = useState(getConfig('geminiKey') ?? '')
+  const [provider, setProvider] = useState<Provider>(activeProvider)
+  const [aiKey, setAiKey] = useState(() => getConfig(keyConfigFor(activeProvider())) ?? '')
+  const [aiModel, setAiModel] = useState(() => getConfig(modelConfigFor(activeProvider())) ?? '')
   const [saved, setSaved] = useState<string | null>(null)
   const [newName, setNewName] = useState('')
   const [newType, setNewType] = useState<AccountType>('bank')
@@ -224,37 +247,70 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Gemini API key</CardTitle>
+          <CardTitle className="text-sm">AI provider</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Powers AI quick entry and CSV categorization. Get one free at{' '}
+            Powers quick entry, the assistant, category creation, and CSV categorization. The key
+            stays in this browser and is sent only to the provider's API. Get a key at{' '}
             <a
               className="text-primary underline underline-offset-4"
-              href="https://aistudio.google.com/apikey"
+              href={KEY_URL[provider].href}
               target="_blank"
               rel="noreferrer"
             >
-              aistudio.google.com/apikey
+              {KEY_URL[provider].label}
             </a>
             .
           </p>
+          <div className="flex flex-wrap gap-1.5">
+            {PROVIDERS.map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => {
+                  setProvider(p)
+                  setAiKey(getConfig(keyConfigFor(p)) ?? '')
+                  setAiModel(getConfig(modelConfigFor(p)) ?? '')
+                }}
+                className={
+                  p === provider
+                    ? 'rounded-full bg-[var(--ink-900)] px-3.5 py-1.5 text-xs font-semibold text-white'
+                    : 'rounded-full bg-[var(--surface-sunken)] px-3.5 py-1.5 text-xs font-medium text-[var(--text-body)] hover:bg-[var(--ink-100)]'
+                }
+              >
+                {PROVIDER_LABEL[p]}
+              </button>
+            ))}
+          </div>
           <div className="flex gap-2">
             <Input
               type="password"
-              placeholder="AIza…"
-              value={geminiKey}
-              onChange={(e) => setGeminiKey(e.target.value)}
+              placeholder={KEY_PLACEHOLDER[provider]}
+              value={aiKey}
+              onChange={(e) => setAiKey(e.target.value)}
             />
-            <Button
-              onClick={() => {
-                setConfig('geminiKey', geminiKey.trim() || null)
-                note(geminiKey.trim() ? 'Gemini key saved.' : 'Gemini key removed.')
-              }}
-            >
-              Save
-            </Button>
+            <Input
+              className="w-44 shrink-0"
+              placeholder={DEFAULT_MODEL[provider]}
+              value={aiModel}
+              onChange={(e) => setAiModel(e.target.value)}
+            />
           </div>
+          <Button
+            onClick={() => {
+              setConfig('aiProvider', provider === 'gemini' ? null : provider)
+              setConfig(keyConfigFor(provider), aiKey.trim() || null)
+              setConfig(modelConfigFor(provider), aiModel.trim() || null)
+              note(
+                aiKey.trim()
+                  ? `${PROVIDER_LABEL[provider]} is now the AI provider.`
+                  : `${PROVIDER_LABEL[provider]} key removed.`,
+              )
+            }}
+          >
+            Save
+          </Button>
         </CardContent>
       </Card>
 
@@ -265,7 +321,7 @@ export default function SettingsPage() {
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
             Reset deletes every transaction, all accounts, budgets, and the AI memory from the
-            data repo, and restores default categories. Your GitHub and Gemini keys stay. Old
+            data repo, and restores default categories. Your GitHub and AI keys stay. Old
             data remains in the repo's git history until you delete the repo itself.
           </p>
           <Button

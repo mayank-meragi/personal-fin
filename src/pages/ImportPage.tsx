@@ -11,7 +11,7 @@ import { fileQueryKey, useAccounts, useCategories } from '../hooks/useData'
 import { groupedCategories } from '../lib/categories'
 import { makeTransaction, useTransactionMutations } from '../hooks/useTransactions'
 import { extractRows, guessMapping, parseBankCsv, computeImportHash, type ColumnMapping, type ImportedRow, type RawCsv } from '../lib/csv'
-import { categorizeWithGemini, hasGeminiKey, GeminiError } from '../lib/gemini'
+import { categorizeWithAi, hasAiKey, AiError } from '../lib/ai'
 import { categorize } from '../lib/quickParse'
 import { loadFile } from '../lib/sync'
 import { monthKey, transactionsPath } from '../lib/dates'
@@ -100,7 +100,7 @@ export default function ImportPage() {
     }
     setBusy(`Categorizing ${targets.length} rows with AI…`)
     try {
-      const ids = await categorizeWithGemini(
+      const ids = await categorizeWithAi(
         targets.map(({ row }) => row.description),
         categories,
       )
@@ -113,7 +113,7 @@ export default function ImportPage() {
           : prev,
       )
     } catch (e) {
-      setNotice(e instanceof GeminiError ? e.message : 'AI categorization failed.')
+      setNotice(e instanceof AiError ? e.message : 'AI categorization failed.')
     } finally {
       setBusy(null)
     }
@@ -208,7 +208,7 @@ export default function ImportPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              {hasGeminiKey() && (
+              {hasAiKey() && (
                 <Button variant="outline" size="sm" disabled={busy !== null} onClick={() => void aiCategorize()}>
                   <Sparkles data-icon="inline-start" />
                   {busy ?? 'Categorize uncategorized with AI'}

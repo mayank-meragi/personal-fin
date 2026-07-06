@@ -4,9 +4,9 @@ import { useQueryClient } from '@tanstack/react-query'
 import { ArrowUp, Check, RotateCcw, Sparkles, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { runAgentTurn, type GeminiContent } from '../lib/assistant/agent'
+import { runAgentTurn, type ChatMessage } from '../lib/assistant/agent'
 import type { AgentAction } from '../lib/assistant/tools'
-import { GeminiError, hasGeminiKey, NoGeminiKeyError } from '../lib/gemini'
+import { AiError, hasAiKey, NoAiKeyError } from '../lib/ai'
 
 type ChatItem =
   | { kind: 'text'; id: string; role: 'user' | 'assistant'; text: string }
@@ -29,7 +29,7 @@ export default function Assistant() {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<ChatItem[]>([])
-  const [history, setHistory] = useState<GeminiContent[]>([])
+  const [history, setHistory] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null)
@@ -77,9 +77,9 @@ export default function Assistant() {
       push({ kind: 'text', id: crypto.randomUUID(), role: 'assistant', text: result.reply })
     } catch (e) {
       const message_ =
-        e instanceof NoGeminiKeyError
-          ? 'The assistant needs a Gemini key — add one in Settings.'
-          : e instanceof GeminiError
+        e instanceof NoAiKeyError
+          ? 'The assistant needs an AI key — add one in Settings.'
+          : e instanceof AiError
             ? e.message
             : 'Something went wrong — try again.'
       push({ kind: 'text', id: crypto.randomUUID(), role: 'assistant', text: message_ })
@@ -237,7 +237,7 @@ export default function Assistant() {
                 <input
                   ref={inputRef}
                   className="min-w-0 flex-1 bg-transparent text-sm text-[var(--text-strong)] outline-none placeholder:text-[var(--text-subtle)]"
-                  placeholder={hasGeminiKey() ? 'Ask or command…' : 'Add a Gemini key in Settings first'}
+                  placeholder={hasAiKey() ? 'Ask or command…' : 'Add an AI key in Settings first'}
                   value={input}
                   disabled={busy}
                   onChange={(e) => setInput(e.target.value)}

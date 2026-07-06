@@ -4,6 +4,12 @@ const DIRTY_KEY = 'pf.dirty'
 const CONFIG_KEYS = {
   githubToken: 'pf.githubToken',
   geminiKey: 'pf.geminiKey',
+  openaiKey: 'pf.openaiKey',
+  anthropicKey: 'pf.anthropicKey',
+  aiProvider: 'pf.aiProvider',
+  geminiModel: 'pf.geminiModel',
+  openaiModel: 'pf.openaiModel',
+  anthropicModel: 'pf.anthropicModel',
   dataRepo: 'pf.dataRepo',
   dataBranch: 'pf.dataBranch',
 } as const

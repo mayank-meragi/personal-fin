@@ -1,13 +1,10 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { getCachedFile } from '../cache'
-import { callGeminiParts, GeminiError, type GeminiPart } from '../gemini'
+import { chat, AiError, type ChatMessage, type ToolResult } from '../llm'
 import { AI_MEMORY_PATH, type AiMemoryFile } from '../aiMemory'
 import { buildOverview, executeTool, functionDeclarations, type ToolContext } from './tools'
 
-export interface GeminiContent {
-  role: 'user' | 'model'
-  parts: GeminiPart[]
-}
+export type { ChatMessage }
 
 const MAX_ROUNDS = 6
 const MAX_TOOL_CALLS = 12
@@ -40,64 +37,60 @@ export interface AgentDeps extends Omit<ToolContext, 'qc'> {
 export interface AgentResult {
   reply: string
   /** Updated conversation to carry into the next turn. */
-  history: GeminiContent[]
+  history: ChatMessage[]
 }
 
 /**
- * One user turn of the agent: call Gemini with tools, execute any function
- * calls against the app, feed results back, and loop until it answers in text.
+ * One user turn of the agent: call the active AI provider with tools, execute
+ * any tool calls against the app, feed results back, and loop until it
+ * answers in text.
  */
 export async function runAgentTurn(
   userMessage: string,
-  history: GeminiContent[],
+  history: ChatMessage[],
   deps: AgentDeps,
 ): Promise<AgentResult> {
-  const contents: GeminiContent[] = [...history, { role: 'user', parts: [{ text: userMessage }] }]
+  const messages: ChatMessage[] = [...history, { role: 'user', text: userMessage }]
   const ctx: ToolContext = deps
   let toolCalls = 0
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
-    const parts = await callGeminiParts({
-      system_instruction: { parts: [{ text: buildSystemPrompt(deps.qc) }] },
-      contents,
-      tools: [{ function_declarations: functionDeclarations }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 2048 },
+    const response = await chat({
+      system: buildSystemPrompt(deps.qc),
+      messages,
+      tools: functionDeclarations,
+      temperature: 0.2,
+      maxOutputTokens: 2048,
     })
+    messages.push(response.message)
 
-    const calls = parts.filter((p) => p.functionCall)
-    if (calls.length === 0) {
-      const reply = parts
-        .map((p) => (typeof p.text === 'string' ? p.text : ''))
-        .join('')
-        .trim()
-      if (!reply) throw new GeminiError('The assistant returned an empty reply.')
-      contents.push({ role: 'model', parts })
-      return { reply, history: contents }
+    if (response.toolCalls.length === 0) {
+      const reply = response.text.trim()
+      if (!reply) throw new AiError('The assistant returned an empty reply.')
+      return { reply, history: messages }
     }
 
-    contents.push({ role: 'model', parts })
-    const responses: GeminiPart[] = []
-    for (const call of calls) {
+    const results: ToolResult[] = []
+    for (const call of response.toolCalls) {
       toolCalls++
       if (toolCalls > MAX_TOOL_CALLS) {
-        responses.push({
-          functionResponse: {
-            name: call.functionCall.name,
-            response: { error: 'tool budget exhausted — summarize what was done' },
-          },
+        results.push({
+          id: call.id,
+          name: call.name,
+          result: { error: 'tool budget exhausted — summarize what was done' },
         })
         continue
       }
       let result: object
       try {
-        result = await executeTool(call.functionCall.name, call.functionCall.args ?? {}, ctx)
+        result = await executeTool(call.name, call.args, ctx)
       } catch (e) {
         result = { error: e instanceof Error ? e.message : 'tool failed' }
       }
-      responses.push({ functionResponse: { name: call.functionCall.name, response: result } })
+      results.push({ id: call.id, name: call.name, result })
     }
-    contents.push({ role: 'user', parts: responses })
+    messages.push({ role: 'tool', results })
   }
 
-  throw new GeminiError('The assistant took too many steps — try a simpler request.')
+  throw new AiError('The assistant took too many steps — try a simpler request.')
 }

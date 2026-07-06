@@ -1,19 +1,9 @@
-import { getConfig } from './cache'
 import { todayISO } from './dates'
+import { generateJson, hasAiKey, AiError, NoAiKeyError, type ImageAttachment } from './llm'
 import { parseBalanceDeclaration } from './quickParse'
 import type { Account, Category, ParsedEntry, Transaction } from './types'
 
-export class NoGeminiKeyError extends Error {}
-export class GeminiError extends Error {}
-
-// Stable alias — always points at the current flash model, so retired
-// versions (like gemini-2.0-flash) don't break the app
-const MODEL = 'gemini-flash-latest'
-const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
-
-export function hasGeminiKey(): boolean {
-  return Boolean(getConfig('geminiKey'))
-}
+export { hasAiKey, AiError, NoAiKeyError }
 
 /** "Kids School Fees" → "kids-school-fees" */
 export function toKebabId(s: string): string {
@@ -29,7 +19,7 @@ export interface ParseContext {
   /** The stored AI memory about this user, injected for better classification */
   memory?: string
   /** A shared payment screenshot / receipt to extract the transaction from */
-  image?: { mimeType: string; data: string }
+  image?: ImageAttachment
 }
 
 function accountLine(a: Account, balances?: Record<string, number>): string {
@@ -92,112 +82,61 @@ Return ONLY the JSON array.`
 }
 
 function buildResponseSchema(accounts: Account[]) {
-  const accountEnum = accounts.length > 0 ? { type: 'STRING', enum: accounts.map((a) => a.id) } : null
+  const accountEnum = accounts.length > 0 ? { type: 'string', enum: accounts.map((a) => a.id) } : null
   return {
-    type: 'ARRAY',
+    type: 'array',
     items: {
-      type: 'OBJECT',
+      type: 'object',
       properties: {
-        type: { type: 'STRING', enum: ['expense', 'income', 'transfer'] },
-        description: { type: 'STRING' },
-        quantity: { type: 'NUMBER' },
-        unitAmount: { type: 'NUMBER' },
-        totalAmount: { type: 'NUMBER' },
-        category: { type: 'STRING' },
-        categoryName: { type: 'STRING' },
-        categoryEmoji: { type: 'STRING' },
-        categoryParent: { type: 'STRING' },
+        type: { type: 'string', enum: ['expense', 'income', 'transfer'] },
+        description: { type: 'string' },
+        quantity: { type: 'number' },
+        unitAmount: { type: 'number' },
+        totalAmount: { type: 'number' },
+        category: { type: 'string' },
+        categoryName: { type: 'string' },
+        categoryEmoji: { type: 'string' },
+        categoryParent: { type: 'string' },
         ...(accountEnum ? { account: accountEnum, toAccount: accountEnum } : {}),
-        statedBalance: { type: 'NUMBER' },
-        date: { type: 'STRING' },
+        statedBalance: { type: 'number' },
+        date: { type: 'string' },
       },
       required: ['type', 'description', 'totalAmount', 'category'],
     },
   }
 }
 
-/** One content part in a Gemini request/response (text, functionCall, functionResponse, …). */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type GeminiPart = Record<string, any>
-
-/** Raw Gemini call returning the candidate's parts — used for function calling. */
-export async function callGeminiParts(body: object): Promise<GeminiPart[]> {
-  const key = getConfig('geminiKey')
-  if (!key) throw new NoGeminiKeyError('No Gemini API key configured')
-  let res: Response
-  try {
-    res = await fetch(ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-      body: JSON.stringify(body),
-      // A runaway generation otherwise leaves the UI stuck forever
-      signal: AbortSignal.timeout(30_000),
-    })
-  } catch (e) {
-    if (e instanceof DOMException && (e.name === 'TimeoutError' || e.name === 'AbortError')) {
-      throw new GeminiError('Gemini took too long — try again.')
-    }
-    throw new GeminiError('Gemini unreachable — are you offline?')
-  }
-  if (res.status === 400 || res.status === 403) {
-    throw new GeminiError('Gemini rejected the API key. Check it in Settings.')
-  }
-  if (res.status === 429) {
-    throw new GeminiError('Gemini rate limit hit — try again in a minute.')
-  }
-  if (!res.ok) throw new GeminiError(`Gemini returned ${res.status}`)
-  const json = await res.json()
-  const parts: GeminiPart[] | undefined = json.candidates?.[0]?.content?.parts
-  if (!parts || parts.length === 0) throw new GeminiError('Gemini returned no content')
-  return parts
-}
-
-async function callGemini(body: object): Promise<string> {
-  const parts = await callGeminiParts(body)
-  const text = parts.find((p) => typeof p.text === 'string')?.text as string | undefined
-  if (!text) throw new GeminiError('Gemini returned no content')
-  return text
-}
-
-/** Parse a quick-entry note into transactions via Gemini structured output. */
-export async function parseWithGemini(
+/** Parse a quick-entry note into transactions via the active AI provider. */
+export async function parseWithAi(
   input: string,
   categories: Category[],
   accounts: Account[] = [],
   context: ParseContext = {},
 ): Promise<ParsedEntry[]> {
-  const parts: object[] = []
-  if (context.image) {
-    parts.push({ inline_data: { mime_type: context.image.mimeType, data: context.image.data } })
-  }
-  parts.push({ text: input || 'Extract the transaction(s) from the attached image.' })
-
-  const text = await callGemini({
-    system_instruction: { parts: [{ text: buildSystemPrompt(categories, accounts, context) }] },
-    contents: [{ parts }],
-    generationConfig: {
-      temperature: 0,
-      // Hard cap: a quick-entry parse is a handful of small objects. Without
-      // this, a degenerate generation loops until the model's own huge limit.
-      maxOutputTokens: 2048,
-      response_mime_type: 'application/json',
-      response_schema: buildResponseSchema(accounts),
-    },
+  const text = await generateJson({
+    system: buildSystemPrompt(categories, accounts, context),
+    text: input || 'Extract the transaction(s) from the attached image.',
+    image: context.image,
+    schema: buildResponseSchema(accounts),
+    temperature: 0,
+    // Hard cap: a quick-entry parse is a handful of small objects. Without
+    // this, a degenerate generation loops until the model's own huge limit.
+    maxOutputTokens: 2048,
   })
 
   let parsed: unknown
   try {
     parsed = JSON.parse(text)
   } catch {
-    // Known degeneration: the model can spiral into infinite trailing zeros
+    // Known degeneration: a model can spiral into infinite trailing zeros
     // when emitting a long decimal (e.g. statedBalance 178457.72000000…),
     // getting truncated at the token cap as invalid JSON. If the input is a
     // balance declaration we can recover it exactly, deterministically.
     const salvage = parseBalanceDeclaration(input, accounts, categories)
-    if (!salvage) throw new GeminiError('Gemini returned invalid JSON')
+    if (!salvage) throw new AiError('The AI returned invalid JSON')
     parsed = [salvage]
   }
-  if (!Array.isArray(parsed)) throw new GeminiError('Gemini returned unexpected shape')
+  if (!Array.isArray(parsed)) throw new AiError('The AI returned an unexpected shape')
 
   const validCategoryIds = new Set(categories.map((c) => c.id))
   const validAccountIds = new Set(accounts.map((a) => a.id))
@@ -317,24 +256,21 @@ Categories: ${categories.map((c) => c.id).join(', ')}
 Recent transactions (newest last):
 ${txLines || '(none)'}`
 
-  const text = await callGemini({
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: {
-      temperature: 0,
-      maxOutputTokens: 1024,
-      response_mime_type: 'application/json',
-      response_schema: {
-        type: 'OBJECT',
-        properties: { summary: { type: 'STRING' } },
-        required: ['summary'],
-      },
+  const text = await generateJson({
+    text: prompt,
+    temperature: 0,
+    maxOutputTokens: 2048,
+    schema: {
+      type: 'object',
+      properties: { summary: { type: 'string' } },
+      required: ['summary'],
     },
   })
   try {
     const parsed = JSON.parse(text) as { summary?: string }
     return (parsed.summary ?? '').trim()
   } catch {
-    throw new GeminiError('Gemini returned invalid memory JSON')
+    throw new AiError('The AI returned invalid memory JSON')
   }
 }
 
@@ -366,27 +302,24 @@ Rules:
   (true only when the money builds wealth — investments, mutual funds, FDs, gold).
 - Create only what the instruction asks for. No filler.`
 
-  const text = await callGemini({
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: {
-      temperature: 0,
-      maxOutputTokens: 2048,
-      response_mime_type: 'application/json',
-      response_schema: {
-        type: 'ARRAY',
-        items: {
-          type: 'OBJECT',
-          properties: {
-            id: { type: 'STRING' },
-            name: { type: 'STRING' },
-            emoji: { type: 'STRING' },
-            type: { type: 'STRING', enum: ['expense', 'income'] },
-            hints: { type: 'ARRAY', items: { type: 'STRING' } },
-            parent: { type: 'STRING' },
-            savings: { type: 'BOOLEAN' },
-          },
-          required: ['id', 'name', 'emoji', 'type', 'hints'],
+  const text = await generateJson({
+    text: prompt,
+    temperature: 0,
+    maxOutputTokens: 2048,
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          name: { type: 'string' },
+          emoji: { type: 'string' },
+          type: { type: 'string', enum: ['expense', 'income'] },
+          hints: { type: 'array', items: { type: 'string' } },
+          parent: { type: 'string' },
+          savings: { type: 'boolean' },
         },
+        required: ['id', 'name', 'emoji', 'type', 'hints'],
       },
     },
   })
@@ -397,7 +330,7 @@ Rules:
     if (!Array.isArray(parsed)) throw new Error('not an array')
     raw = parsed as Partial<Category>[]
   } catch {
-    throw new GeminiError('Gemini returned invalid categories')
+    throw new AiError('The AI returned invalid categories')
   }
 
   // Validate incrementally so a batch item can parent later items
@@ -423,7 +356,7 @@ Rules:
     known.set(id, category)
     result.push(category)
   }
-  if (result.length === 0) throw new GeminiError('Gemini returned no usable categories')
+  if (result.length === 0) throw new AiError('The AI returned no usable categories')
   return result
 }
 
@@ -433,9 +366,7 @@ const CHUNK_SIZE = 50
  * Categorize bank-statement descriptions in bulk. Returns one category id per
  * input index; unresolved indices come back as "other".
  */
-export async function categorizeWithGemini(descriptions: string[], categories: Category[]): Promise<string[]> {
-  const key = getConfig('geminiKey')
-  if (!key) throw new NoGeminiKeyError('No Gemini API key configured')
+export async function categorizeWithAi(descriptions: string[], categories: Category[]): Promise<string[]> {
   const expenseIds = categories.map((c) => c.id)
   const result: string[] = descriptions.map(() => 'other')
 
@@ -452,37 +383,22 @@ Return one object per input with its index (0-based, within this batch) and cate
 Descriptions:
 ${chunk.map((d, i) => `${i}: ${d}`).join('\n')}`
 
-    let res: Response
-    try {
-      res = await fetch(ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0,
-            response_mime_type: 'application/json',
-            response_schema: {
-              type: 'ARRAY',
-              items: {
-                type: 'OBJECT',
-                properties: {
-                  index: { type: 'NUMBER' },
-                  category: { type: 'STRING', enum: expenseIds },
-                },
-                required: ['index', 'category'],
-              },
-            },
+    const text = await generateJson({
+      text: prompt,
+      temperature: 0,
+      maxOutputTokens: 4096,
+      schema: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            index: { type: 'number' },
+            category: { type: 'string', enum: expenseIds },
           },
-        }),
-      })
-    } catch {
-      throw new GeminiError('Gemini unreachable — are you offline?')
-    }
-    if (!res.ok) throw new GeminiError(`Gemini returned ${res.status}`)
-    const json = await res.json()
-    const text: string | undefined = json.candidates?.[0]?.content?.parts?.[0]?.text
-    if (!text) continue
+          required: ['index', 'category'],
+        },
+      },
+    })
     try {
       const items = JSON.parse(text) as { index: number; category: string }[]
       const validIds = new Set(expenseIds)

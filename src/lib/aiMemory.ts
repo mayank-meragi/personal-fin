@@ -1,7 +1,7 @@
 import { getCachedFile } from './cache'
 import { updateFile } from './sync'
 import { accountBalances } from './accounts'
-import { generateMemorySummary, hasGeminiKey } from './gemini'
+import { generateMemorySummary, hasAiKey } from './ai'
 import type { Account, Category, Transaction } from './types'
 
 export const AI_MEMORY_PATH = 'ai-memory.json'
@@ -33,7 +33,7 @@ export async function maybeRefreshAiMemory(
   categories: Category[],
   accounts: Account[],
 ): Promise<AiMemoryFile | null> {
-  if (!hasGeminiKey()) return null
+  if (!hasAiKey()) return null
   const memory = getAiMemory()
   if (allTransactions.length === memory.txCount) return null
   try {

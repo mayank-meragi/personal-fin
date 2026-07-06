@@ -6,7 +6,8 @@ import { categoryDisplayName } from '../categories'
 import { currentMonthKey, todayISO, transactionsPath } from '../dates'
 import { fileQueryKey } from '../queryKeys'
 import { splitSpendingSavings, totals } from '../stats'
-import { toKebabId } from '../gemini'
+import { toKebabId } from '../ai'
+import type { ToolDef } from '../llm'
 import type {
   Account,
   AccountsFile,
@@ -88,7 +89,7 @@ Categories:
 ${categoryLines || '(none)'}`
 }
 
-// ---- Tool declarations (Gemini functionDeclarations) ----
+// ---- Tool declarations (provider-neutral; adapters convert the schemas) ----
 
 const PAGES: Record<string, string> = {
   dashboard: '/',
@@ -100,19 +101,19 @@ const PAGES: Record<string, string> = {
   settings: '/settings',
 }
 
-export const functionDeclarations = [
+export const functionDeclarations: ToolDef[] = [
   {
     name: 'list_transactions',
     description:
       'List transactions, optionally filtered by month (YYYY-MM), category id, account id, or text in the note. Returns id, date, type, amount, category, account, note.',
     parameters: {
-      type: 'OBJECT',
+      type: 'object',
       properties: {
-        month: { type: 'STRING', description: 'YYYY-MM; omit for all months' },
-        category: { type: 'STRING' },
-        account: { type: 'STRING' },
-        text: { type: 'STRING', description: 'substring to search in notes' },
-        limit: { type: 'NUMBER', description: 'max rows, default 50' },
+        month: { type: 'string', description: 'YYYY-MM; omit for all months' },
+        category: { type: 'string' },
+        account: { type: 'string' },
+        text: { type: 'string', description: 'substring to search in notes' },
+        limit: { type: 'number', description: 'max rows, default 50' },
       },
     },
   },
@@ -121,20 +122,20 @@ export const functionDeclarations = [
     description:
       'Record one or more transactions. Transfers move money between own accounts (set toAccount). Amounts in INR, positive numbers.',
     parameters: {
-      type: 'OBJECT',
+      type: 'object',
       properties: {
         entries: {
-          type: 'ARRAY',
+          type: 'array',
           items: {
-            type: 'OBJECT',
+            type: 'object',
             properties: {
-              type: { type: 'STRING', enum: ['expense', 'income', 'transfer'] },
-              amount: { type: 'NUMBER' },
-              date: { type: 'STRING', description: 'YYYY-MM-DD, default today' },
-              category: { type: 'STRING', description: 'existing category id; "transfer" for transfers' },
-              account: { type: 'STRING', description: 'existing account id (source for transfers)' },
-              toAccount: { type: 'STRING', description: 'destination account id, transfers only' },
-              note: { type: 'STRING' },
+              type: { type: 'string', enum: ['expense', 'income', 'transfer'] },
+              amount: { type: 'number' },
+              date: { type: 'string', description: 'YYYY-MM-DD, default today' },
+              category: { type: 'string', description: 'existing category id; "transfer" for transfers' },
+              account: { type: 'string', description: 'existing account id (source for transfers)' },
+              toAccount: { type: 'string', description: 'destination account id, transfers only' },
+              note: { type: 'string' },
             },
             required: ['type', 'amount', 'note'],
           },
@@ -147,18 +148,18 @@ export const functionDeclarations = [
     name: 'update_transaction',
     description: 'Update fields of an existing transaction found via list_transactions.',
     parameters: {
-      type: 'OBJECT',
+      type: 'object',
       properties: {
-        id: { type: 'STRING' },
+        id: { type: 'string' },
         patch: {
-          type: 'OBJECT',
+          type: 'object',
           properties: {
-            amount: { type: 'NUMBER' },
-            date: { type: 'STRING' },
-            category: { type: 'STRING' },
-            account: { type: 'STRING' },
-            note: { type: 'STRING' },
-            type: { type: 'STRING', enum: ['expense', 'income', 'transfer'] },
+            amount: { type: 'number' },
+            date: { type: 'string' },
+            category: { type: 'string' },
+            account: { type: 'string' },
+            note: { type: 'string' },
+            type: { type: 'string', enum: ['expense', 'income', 'transfer'] },
           },
         },
       },
@@ -169,8 +170,8 @@ export const functionDeclarations = [
     name: 'delete_transaction',
     description: 'Delete a transaction permanently. The user is asked to confirm first.',
     parameters: {
-      type: 'OBJECT',
-      properties: { id: { type: 'STRING' } },
+      type: 'object',
+      properties: { id: { type: 'string' } },
       required: ['id'],
     },
   },
@@ -179,19 +180,19 @@ export const functionDeclarations = [
     description:
       'Create new categories or subcategories. parent must be an existing top-level category id. savings=true for wealth-building categories (investments, FDs).',
     parameters: {
-      type: 'OBJECT',
+      type: 'object',
       properties: {
         categories: {
-          type: 'ARRAY',
+          type: 'array',
           items: {
-            type: 'OBJECT',
+            type: 'object',
             properties: {
-              name: { type: 'STRING' },
-              emoji: { type: 'STRING' },
-              type: { type: 'STRING', enum: ['expense', 'income'] },
-              parent: { type: 'STRING' },
-              savings: { type: 'BOOLEAN' },
-              hints: { type: 'ARRAY', items: { type: 'STRING' } },
+              name: { type: 'string' },
+              emoji: { type: 'string' },
+              type: { type: 'string', enum: ['expense', 'income'] },
+              parent: { type: 'string' },
+              savings: { type: 'boolean' },
+              hints: { type: 'array', items: { type: 'string' } },
             },
             required: ['name'],
           },
@@ -204,15 +205,15 @@ export const functionDeclarations = [
     name: 'update_category',
     description: 'Rename a category, change its keyword hints, or toggle its savings nature.',
     parameters: {
-      type: 'OBJECT',
+      type: 'object',
       properties: {
-        id: { type: 'STRING' },
+        id: { type: 'string' },
         patch: {
-          type: 'OBJECT',
+          type: 'object',
           properties: {
-            name: { type: 'STRING' },
-            savings: { type: 'BOOLEAN' },
-            hints: { type: 'ARRAY', items: { type: 'STRING' } },
+            name: { type: 'string' },
+            savings: { type: 'boolean' },
+            hints: { type: 'array', items: { type: 'string' } },
           },
         },
       },
@@ -224,11 +225,11 @@ export const functionDeclarations = [
     description:
       'Set a monthly budget limit for a category (0 or null clears it). With month (YYYY-MM), sets an override for that month only.',
     parameters: {
-      type: 'OBJECT',
+      type: 'object',
       properties: {
-        categoryId: { type: 'STRING' },
-        monthlyLimit: { type: 'NUMBER' },
-        month: { type: 'STRING', description: 'YYYY-MM for a one-month override' },
+        categoryId: { type: 'string' },
+        monthlyLimit: { type: 'number' },
+        month: { type: 'string', description: 'YYYY-MM for a one-month override' },
       },
       required: ['categoryId', 'monthlyLimit'],
     },
@@ -238,11 +239,11 @@ export const functionDeclarations = [
     description:
       'Add a bank, credit-card, or cash account. For credit cards, startingBalance is the amount owed (positive; stored as debt).',
     parameters: {
-      type: 'OBJECT',
+      type: 'object',
       properties: {
-        name: { type: 'STRING' },
-        type: { type: 'STRING', enum: ['bank', 'credit-card', 'cash'] },
-        startingBalance: { type: 'NUMBER' },
+        name: { type: 'string' },
+        type: { type: 'string', enum: ['bank', 'credit-card', 'cash'] },
+        startingBalance: { type: 'number' },
       },
       required: ['name', 'type'],
     },
@@ -251,12 +252,12 @@ export const functionDeclarations = [
     name: 'update_account',
     description: 'Rename an account or correct its starting balance.',
     parameters: {
-      type: 'OBJECT',
+      type: 'object',
       properties: {
-        id: { type: 'STRING' },
+        id: { type: 'string' },
         patch: {
-          type: 'OBJECT',
-          properties: { name: { type: 'STRING' }, startingBalance: { type: 'NUMBER' } },
+          type: 'object',
+          properties: { name: { type: 'string' }, startingBalance: { type: 'number' } },
         },
       },
       required: ['id', 'patch'],
@@ -266,9 +267,9 @@ export const functionDeclarations = [
     name: 'navigate',
     description: 'Take the user to a page of the app.',
     parameters: {
-      type: 'OBJECT',
+      type: 'object',
       properties: {
-        page: { type: 'STRING', enum: ['dashboard', 'activity', 'budgets', 'categories', 'import', 'settings'] },
+        page: { type: 'string', enum: ['dashboard', 'activity', 'budgets', 'categories', 'import', 'settings'] },
       },
       required: ['page'],
     },

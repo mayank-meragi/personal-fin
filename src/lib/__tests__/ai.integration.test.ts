@@ -1,7 +1,7 @@
 /**
- * Live integration test of Gemini parsing. Skipped unless a key is provided:
+ * Live integration test of AI parsing (Gemini provider). Skipped unless a key is provided:
  *
- *   PF_TEST_GEMINI_KEY=... npx vitest run src/lib/__tests__/gemini.integration.test.ts
+ *   PF_TEST_GEMINI_KEY=... npx vitest run src/lib/__tests__/ai.integration.test.ts
  */
 import { beforeAll, describe, expect, it } from 'vitest'
 import { defaultCategories } from '../../defaults/categories'
@@ -37,8 +37,8 @@ describe.skipIf(!KEY)('Gemini parsing against the live API', () => {
   })
 
   it('classifies "paid credit card 3200" as a transfer between accounts', async () => {
-    const { parseWithGemini } = await import('../gemini')
-    const [entry] = await parseWithGemini('paid credit card 3200', defaultCategories.categories, accounts, {
+    const { parseWithAi } = await import('../ai')
+    const [entry] = await parseWithAi('paid credit card 3200', defaultCategories.categories, accounts, {
       balances: { 'hdfc-savings': 50000, 'icici-card': -4500, cash: 2000 },
     })
     expect(entry.type).toBe('transfer')
@@ -48,16 +48,16 @@ describe.skipIf(!KEY)('Gemini parsing against the live API', () => {
   }, 30_000)
 
   it('classifies cash withdrawal as bank → cash transfer', async () => {
-    const { parseWithGemini } = await import('../gemini')
-    const [entry] = await parseWithGemini('withdrew 2000 from hdfc', defaultCategories.categories, accounts, {})
+    const { parseWithAi } = await import('../ai')
+    const [entry] = await parseWithAi('withdrew 2000 from hdfc', defaultCategories.categories, accounts, {})
     expect(entry.type).toBe('transfer')
     expect(entry.account).toBe('hdfc-savings')
     expect(entry.toAccount).toBe('cash')
   }, 30_000)
 
   it('still parses plain expenses with an account hint from memory', async () => {
-    const { parseWithGemini } = await import('../gemini')
-    const [entry] = await parseWithGemini('swiggy 340', defaultCategories.categories, accounts, {
+    const { parseWithAi } = await import('../ai')
+    const [entry] = await parseWithAi('swiggy 340', defaultCategories.categories, accounts, {
       memory: '- swiggy and zomato orders always go on the ICICI Card (icici-card)',
     })
     expect(entry.type).toBe('expense')
@@ -66,7 +66,7 @@ describe.skipIf(!KEY)('Gemini parsing against the live API', () => {
   }, 30_000)
 
   it('generates a compact memory summary from transactions', async () => {
-    const { generateMemorySummary } = await import('../gemini')
+    const { generateMemorySummary } = await import('../ai')
     const summary = await generateMemorySummary(
       '',
       [

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { useCategories } from '../hooks/useData'
 import { groupedCategories } from '../lib/categories'
 import { categoryColor, categoryIcon } from '../lib/categoryIcon'
-import { generateCategories, GeminiError, hasGeminiKey, NoGeminiKeyError } from '../lib/gemini'
+import { generateCategories, AiError, hasAiKey, NoAiKeyError } from '../lib/ai'
 import type { Category } from '../lib/types'
 
 /** Toggle chip for a category's spending/savings nature */
@@ -34,8 +34,8 @@ export default function CategoriesPage() {
     try {
       setCatPreview(await generateCategories(desc, categories))
     } catch (e) {
-      if (e instanceof NoGeminiKeyError) setCatError('Add a Gemini key in Settings to create categories with AI.')
-      else setCatError(e instanceof GeminiError ? e.message : 'Could not create categories from that.')
+      if (e instanceof NoAiKeyError) setCatError('Add an AI key in Settings to create categories with AI.')
+      else setCatError(e instanceof AiError ? e.message : 'Could not create categories from that.')
     } finally {
       setCatBusy(false)
     }
@@ -80,7 +80,7 @@ export default function CategoriesPage() {
             <Button
               size="sm"
               className="h-9"
-              disabled={catBusy || !catDesc.trim() || !hasGeminiKey()}
+              disabled={catBusy || !catDesc.trim() || !hasAiKey()}
               onClick={() => void suggestCategories()}
             >
               <Sparkles data-icon="inline-start" />

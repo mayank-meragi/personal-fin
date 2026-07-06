@@ -117,4 +117,11 @@ provider choice with Gemini preselected.
   adapter is still written with a base-URL constant so adding it later is trivial).
 - Granularity: **one global provider** for every AI feature; per-feature override is a
   possible later addition, no rework needed.
-- Status: planned, not yet implemented.
+- Status: **shipped** — `src/lib/llm/` (types + gemini/openai/anthropic adapters + dispatch),
+  domain logic moved to `src/lib/ai.ts`, agent loop provider-neutral, Settings provider card,
+  onboarding provider select. Verified live on Gemini (parse, memory, agent loop); OpenAI and
+  Anthropic adapters verified against stubbed wire formats — first live call needs a real key.
+- Found during verification: `gemini-flash-latest` now resolves to a thinking model whose
+  thought tokens silently consumed `maxOutputTokens` on structured calls (memory summaries
+  truncating to invalid JSON). Fixed by `thinkingConfig: { thinkingBudget: 0 }` on all
+  structured-output requests; agent chat keeps thinking enabled.

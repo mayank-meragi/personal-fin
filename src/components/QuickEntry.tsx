@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { fileQueryKey, useAccounts, useCategories, useFileQuery } from '../hooks/useData'
 import { makeTransaction, useAllTransactions, useTransactionMutations } from '../hooks/useTransactions'
-import { hasGeminiKey, parseWithGemini, GeminiError, NoGeminiKeyError } from '../lib/gemini'
+import { hasAiKey, parseWithAi, AiError, NoAiKeyError } from '../lib/ai'
 import { quickParse } from '../lib/quickParse'
 import { accountBalances, accountTypeEmoji, inferAccount } from '../lib/accounts'
 import { AI_MEMORY_PATH, emptyAiMemory, maybeRefreshAiMemory, type AiMemoryFile } from '../lib/aiMemory'
@@ -122,7 +122,7 @@ export default function QuickEntry() {
     setNotice(null)
     try {
       const result = withInferredAccounts(
-        await parseWithGemini(input, categories, accounts, {
+        await parseWithAi(input, categories, accounts, {
           balances: accountBalances(accounts, history),
           memory: aiMemory?.summary,
           image: image ? { mimeType: image.mimeType, data: image.data } : undefined,
@@ -141,15 +141,15 @@ export default function QuickEntry() {
     } catch (e) {
       const fallback = withInferredAccounts(quickParse(input, categories, accounts)).map(resolveStatedBalance)
       setEntries(fallback)
-      if (e instanceof NoGeminiKeyError) {
+      if (e instanceof NoAiKeyError) {
         setNotice(
           image
-            ? 'Reading screenshots needs a Gemini key — add one in Settings.'
+            ? 'Reading screenshots needs an AI key — add one in Settings.'
             : fallback.length === 0
-              ? 'Could not parse that. Add a Gemini key in Settings for smarter parsing.'
+              ? 'Could not parse that. Add an AI key in Settings for smarter parsing.'
               : null,
         )
-      } else if (e instanceof GeminiError) {
+      } else if (e instanceof AiError) {
         setNotice(`${e.message}${fallback.length > 0 ? ' — used simple parsing instead.' : ''}`)
       } else {
         setNotice('Parsing failed unexpectedly.')
@@ -250,7 +250,7 @@ export default function QuickEntry() {
         </button>
         <input
           className="min-w-0 flex-1 bg-transparent text-[15px] text-[var(--text-strong)] outline-none placeholder:text-[var(--text-subtle)]"
-          placeholder={hasGeminiKey() ? 'Add anything — "auto 85", "23k left in hdfc"…' : 'Add anything — "tea 10"…'}
+          placeholder={hasAiKey() ? 'Add anything — "auto 85", "23k left in hdfc"…' : 'Add anything — "tea 10"…'}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
