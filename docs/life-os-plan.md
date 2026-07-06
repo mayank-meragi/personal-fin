@@ -151,6 +151,7 @@ Each phase builds, screenshots, and works standalone; push whenever you say.
 - Status: **implemented locally** (all 5 phases). Verified: build + full test suite green,
   live Gemini runs (first-workout generation honoring an injury, 12-day-gap comeback at
   ~85% load with full-body fallback, quick-log parse, agent log_workout), screenshots of
-  hub/fitness/finance against live data. Finance data COPIED to `finance/` in the repo;
-  root originals still present — on deploy, re-run the copy for changed files and delete
-  the root originals (`/tmp/pf-migrate.sh` pattern), then push.
+  hub/fitness/finance against live data. **Deployed 2026-07-06**; data migration
+  finalized — root finance files re-synced to `finance/` and deleted
+  (`scripts/migrate-finance-data.sh --delete-originals`); repo root is now just
+  `finance/`, `fitness/`, `settings.json`.
