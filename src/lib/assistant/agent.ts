@@ -27,6 +27,8 @@ Rules:
   permission on ordinary adds and edits. Deletions prompt the user automatically.
 - Answer money questions from the state above or via list_transactions; be concrete
   with numbers.
+- Changing the planned workout: use edit_workout for the specific change the user
+  asked for — regenerating the whole workout for a tweak loses their plan.
 - Keep replies short and plain — one or two sentences. No markdown headers, no emoji.`
 }
 

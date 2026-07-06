@@ -13,6 +13,7 @@ import { loadFile } from '../sync'
 import type { ToolDef } from '../llm'
 import { fetchExercises } from '@/modules/fitness/lib/exerciseDb'
 import { deleteSession, savePlan, saveSession } from '@/modules/fitness/lib/data'
+import { applyWorkoutEdits, type WorkoutEdit } from '@/modules/fitness/lib/editPlan'
 import { generateNextWorkout, parseQuickLog } from '@/modules/fitness/lib/planner'
 import { formatSet, sessionVolume, setSummary } from '@/modules/fitness/lib/stats'
 import type { FitnessProfile, PlanFile, WorkoutSession } from '@/modules/fitness/lib/types'
@@ -79,7 +80,7 @@ function fitnessOverview(qc: QueryClient): string {
   const plan = readFile<PlanFile>(qc, FITNESS_PATHS.plan, { next: null })
   if (!profile) return 'Fitness: not set up (no training profile yet — it lives on the fitness Plan page).'
   const planLine = plan.next
-    ? `next workout ready: "${plan.next.name}" with ${plan.next.exercises.length} exercises`
+    ? `next workout ready: "${plan.next.name}" — ${plan.next.exercises.map((e) => `${e.name} ${setSummary(e.sets)}`).join('; ')}`
     : 'no workout planned right now'
   return `Fitness: goal ${profile.goal}, intends ${profile.daysPerWeek} sessions/week; ${planLine}.`
 }
@@ -322,10 +323,38 @@ export const functionDeclarations: ToolDef[] = [
   {
     name: 'generate_next_workout',
     description:
-      'Build the next AI-programmed workout from the user\'s training profile and history, and set it as the plan. Optionally pass a special request ("make it a leg day", "something short").',
+      'Build a BRAND-NEW next workout from the user\'s training profile and history, replacing the current plan entirely. Optionally pass a special request ("make it a leg day", "something short"). For tweaks to the existing plan use edit_workout instead — never regenerate for a tweak.',
     parameters: {
       type: 'object',
       properties: { request: { type: 'string', description: 'optional user preference for this workout' } },
+    },
+  },
+  {
+    name: 'edit_workout',
+    description:
+      'Modify the CURRENTLY planned workout in place — only the named parts change, everything else (including completed sets) stays. Use for: swapping/removing/adding an exercise, changing sets/reps/weight/duration/rest.',
+    parameters: {
+      type: 'object',
+      properties: {
+        edits: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              action: { type: 'string', enum: ['remove', 'swap', 'add', 'update_sets', 'update_rest'] },
+              exercise: { type: 'string', description: 'exercise name in the current plan to target (remove/swap/update)' },
+              newExercise: { type: 'string', description: 'library exercise name (swap/add)' },
+              sets: { type: 'number', description: 'total number of sets' },
+              reps: { type: 'number', description: 'target reps per set' },
+              weightKg: { type: 'number' },
+              durationMinutes: { type: 'number', description: 'for timed (cardio/stretch) work' },
+              restSeconds: { type: 'number' },
+            },
+            required: ['action'],
+          },
+        },
+      },
+      required: ['edits'],
     },
   },
   {
@@ -632,6 +661,34 @@ export async function executeTool(name: string, args: Args, ctx: ToolContext): P
       return {
         ok: true,
         workout: { name: workout.name, exercises: workout.exercises.map((e) => `${e.name} ${setSummary(e.sets)}`) },
+      }
+    }
+
+    case 'edit_workout': {
+      const plan = readFile<PlanFile>(qc, FITNESS_PATHS.plan, { next: null })
+      if (!plan.next) return { error: 'no workout is planned — generate one first' }
+      const edits: WorkoutEdit[] = Array.isArray(args.edits) ? args.edits : []
+      if (edits.length === 0) return { error: 'no edits given' }
+      const library = await fetchExercises()
+      let result: { workout: typeof plan.next; changes: string[] }
+      try {
+        result = applyWorkoutEdits(plan.next, edits, library)
+      } catch (e) {
+        return { error: e instanceof Error ? e.message : 'could not apply that edit' }
+      }
+      const previous = plan.next
+      savePlan(qc, { next: result.workout, generatedAt: plan.generatedAt })
+      ctx.onAction({
+        label: `Workout updated: ${result.changes.join('; ')}`,
+        undo: () => savePlan(qc, { next: previous, generatedAt: plan.generatedAt }),
+      })
+      return {
+        ok: true,
+        changes: result.changes,
+        workout: {
+          name: result.workout.name,
+          exercises: result.workout.exercises.map((e) => `${e.name} ${setSummary(e.sets)}`),
+        },
       }
     }
 
