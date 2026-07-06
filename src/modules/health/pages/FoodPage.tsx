@@ -1,8 +1,23 @@
 import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ImagePlus, Sparkles, Trash2, X } from 'lucide-react'
+import {
+  Beef,
+  ChevronDown,
+  ChevronUp,
+  Cookie,
+  Flame,
+  ImagePlus,
+  Moon,
+  Pencil,
+  Plus,
+  Soup,
+  Sparkles,
+  Sunrise,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { AiError, NoAiKeyError, hasAiKey } from '@/lib/ai'
@@ -17,33 +32,86 @@ import { useHealthMutations } from '../lib/data'
 import MealEditDialog from '../components/MealEditDialog'
 
 const MEAL_ORDER: MealType[] = ['breakfast', 'lunch', 'snack', 'dinner']
-const MEAL_LABEL: Record<MealType, string> = { breakfast: 'Breakfast', lunch: 'Lunch', snack: 'Snacks', dinner: 'Dinner' }
+const MEAL_META: Record<MealType, { label: string; icon: typeof Sunrise }> = {
+  breakfast: { label: 'Breakfast', icon: Sunrise },
+  lunch: { label: 'Lunch', icon: Soup },
+  snack: { label: 'Snacks', icon: Cookie },
+  dinner: { label: 'Dinner', icon: Moon },
+}
 
 /** Older meals predate mealType — infer from when they were logged. */
 function mealTypeOf(meal: Meal): MealType {
   return meal.mealType ?? inferMealType(new Date(meal.createdAt))
 }
 
-function MacroBar({ label, value, target, unit }: { label: string; value: number; target?: number; unit: string }) {
-  const pct = target ? Math.min((value / target) * 100, 100) : 0
-  const over = target ? value > target : false
+function CalorieRing({ value, target }: { value: number; target?: number }) {
+  const R = 52
+  const C = 2 * Math.PI * R
+  const progress = target ? Math.min(value / target, 1) : 0
   return (
-    <div className="space-y-1">
-      <div className="flex items-baseline justify-between">
-        <span className="text-xs font-semibold text-muted-foreground">{label}</span>
-        <span className="font-mono text-sm font-bold tabular-nums text-[var(--text-strong)]">
-          {Math.round(value)}
-          {target ? <span className="text-xs font-medium text-muted-foreground"> / {target}{unit}</span> : unit}
-        </span>
-      </div>
-      {target ? (
-        <div className="h-2.5 overflow-hidden rounded-full bg-[var(--surface-sunken)]">
-          <div
-            className={cn('h-full rounded-full', over ? 'bg-[var(--negative-500,#e5484d)]' : 'bg-[var(--brand)]')}
-            style={{ width: `${pct}%` }}
+    <div className="relative flex size-32 shrink-0 items-center justify-center">
+      <svg viewBox="0 0 120 120" className="absolute inset-0 -rotate-90">
+        <circle cx="60" cy="60" r={R} fill="none" stroke="var(--surface-sunken)" strokeWidth="9" />
+        {target ? (
+          <circle
+            cx="60"
+            cy="60"
+            r={R}
+            fill="none"
+            stroke={value > target ? 'var(--money-out)' : 'var(--brand)'}
+            strokeWidth="9"
+            strokeLinecap="round"
+            strokeDasharray={`${progress * C} ${C}`}
           />
+        ) : null}
+      </svg>
+      <div className="text-center">
+        <p className="font-mono text-2xl font-bold tabular-nums text-[var(--text-strong)]">{Math.round(value)}</p>
+        <p className="text-[10px] leading-tight text-muted-foreground">
+          kcal{target ? <span className="block">of {target} kcal</span> : null}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function MacroRow({
+  icon: Icon,
+  label,
+  value,
+  target,
+  unit,
+}: {
+  icon: typeof Flame
+  label: string
+  value: number
+  target?: number
+  unit: string
+}) {
+  const pct = target ? Math.round((value / target) * 100) : null
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--emerald-100)] text-[var(--emerald-700)]">
+        <Icon className="size-4" />
+      </span>
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="text-sm font-semibold text-[var(--text-strong)]">{label}</span>
+          <span className="font-mono text-sm font-bold tabular-nums">
+            {Math.round(value)}
+            {target ? <span className="text-xs font-medium text-muted-foreground"> / {target}{unit}</span> : unit}
+          </span>
         </div>
-      ) : null}
+        <div className="flex items-center gap-2">
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--surface-sunken)]">
+            <div
+              className={cn('h-full rounded-full', pct !== null && pct > 100 ? 'bg-[var(--money-out)]' : 'bg-[var(--brand)]')}
+              style={{ width: `${Math.min(pct ?? 0, 100)}%` }}
+            />
+          </div>
+          {pct !== null && <span className="w-9 shrink-0 text-right text-[10px] font-bold text-[var(--emerald-700)]">{pct}%</span>}
+        </div>
+      </div>
     </div>
   )
 }
@@ -65,11 +133,17 @@ export default function FoodPage() {
   const [proteinInput, setProteinInput] = useState('')
   const [suggesting, setSuggesting] = useState(false)
   const [editing, setEditing] = useState<Meal | null>(null)
+  const [moreNutrients, setMoreNutrients] = useState(false)
+  const [collapsed, setCollapsed] = useState<Set<MealType>>(new Set())
+  const [pendingMealType, setPendingMealType] = useState<MealType | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const todayMeals = meals.filter((m) => m.date === today)
   const calories = todayMeals.reduce((s, m) => s + m.calories, 0)
   const protein = todayMeals.reduce((s, m) => s + m.proteinG, 0)
+  const carbs = todayMeals.reduce((s, m) => s + (m.carbsG ?? 0), 0)
+  const fat = todayMeals.reduce((s, m) => s + (m.fatG ?? 0), 0)
 
   function attachImage(blob: Blob) {
     const reader = new FileReader()
@@ -87,10 +161,13 @@ export default function FoodPage() {
     setNotice(null)
     try {
       const meal = await parseMeal(input, image ? { mimeType: image.mimeType, data: image.data } : undefined)
+      // "Add more food" on a section pins the meal there, whatever the clock says
+      if (pendingMealType) meal.mealType = pendingMealType
       saveMeal(qc, meal)
       setText('')
       if (image) URL.revokeObjectURL(image.previewUrl)
       setImage(null)
+      setPendingMealType(null)
       setNotice(`Logged ${meal.calories} kcal · ${meal.proteinG}g protein.`)
     } catch (e) {
       setNotice(
@@ -115,8 +192,6 @@ export default function FoodPage() {
       const latest = metrics[metrics.length - 1]
       const suggested = await suggestTargets({ profile, latestWeightKg: latest?.weightKg, coachNotes })
       setTargets(suggested)
-      setCalInput(String(suggested.calories))
-      setProteinInput(String(suggested.proteinG))
       setNotice(suggested.rationale ?? 'Targets set.')
       setEditingTargets(false)
     } catch (e) {
@@ -126,27 +201,98 @@ export default function FoodPage() {
     }
   }
 
+  function addTo(type: MealType) {
+    setPendingMealType(type)
+    inputRef.current?.focus()
+  }
+
   return (
     <div className="space-y-3">
       <h1 className="text-xl font-semibold tracking-tight">Food</h1>
 
+      {/* Nutrition summary */}
       <Card>
-        <CardContent className="space-y-3 py-3.5">
-          <MacroBar label="Calories" value={calories} target={targets?.calories} unit=" kcal" />
-          <MacroBar label="Protein" value={protein} target={targets?.proteinG} unit="g" />
-          {!targets && (
+        <CardContent className="space-y-3 py-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold text-[var(--text-strong)]">Nutrition summary</h2>
+            <button
+              type="button"
+              className="flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-foreground"
+              onClick={() => {
+                setCalInput(targets ? String(targets.calories) : '')
+                setProteinInput(targets ? String(targets.proteinG) : '')
+                setEditingTargets((v) => !v)
+              }}
+            >
+              <Pencil className="size-3" /> Edit goals
+            </button>
+          </div>
+
+          {editingTargets ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Input className="w-24" type="number" placeholder="kcal" value={calInput} onChange={(e) => setCalInput(e.target.value)} />
+              <Input className="w-24" type="number" placeholder="protein g" value={proteinInput} onChange={(e) => setProteinInput(e.target.value)} />
+              <Button
+                size="sm"
+                disabled={!Number(calInput) || !Number(proteinInput)}
+                onClick={() => {
+                  setTargets({ calories: Math.round(Number(calInput)), proteinG: Math.round(Number(proteinInput)) })
+                  setEditingTargets(false)
+                }}
+              >
+                Save
+              </Button>
+              <Button size="sm" variant="outline" disabled={suggesting || !hasAiKey()} onClick={() => void suggest()}>
+                {suggesting ? 'Thinking…' : 'Suggest with AI'}
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-4">
+              <CalorieRing value={calories} target={targets?.calories} />
+              <div className="min-w-0 flex-1 space-y-3">
+                <MacroRow icon={Flame} label="Calories" value={calories} target={targets?.calories} unit=" kcal" />
+                <MacroRow icon={Beef} label="Protein" value={protein} target={targets?.proteinG} unit="g" />
+              </div>
+            </div>
+          )}
+
+          {!targets && !editingTargets && (
             <p className="text-xs text-muted-foreground">
-              No daily targets yet —{' '}
+              No goals yet —{' '}
               <button type="button" className="underline underline-offset-4" onClick={() => setEditingTargets(true)}>
                 set them
               </button>{' '}
               or{' '}
-              <button type="button" className="underline underline-offset-4" disabled={suggesting || !hasAiKey()} onClick={() => void suggest()}>
+              <button
+                type="button"
+                className="underline underline-offset-4"
+                disabled={suggesting || !hasAiKey()}
+                onClick={() => void suggest()}
+              >
                 {suggesting ? 'thinking…' : 'let AI suggest'}
               </button>
               .
             </p>
           )}
+
+          {moreNutrients && (
+            <div className="flex gap-6 border-t border-[var(--border-subtle)] pt-3">
+              <p className="text-sm text-muted-foreground">
+                Carbs <span className="font-mono font-bold text-[var(--text-strong)] tabular-nums">{Math.round(carbs)}g</span>
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Fat <span className="font-mono font-bold text-[var(--text-strong)] tabular-nums">{Math.round(fat)}g</span>
+              </p>
+            </div>
+          )}
+          <button
+            type="button"
+            className="flex w-full items-center justify-center gap-1 text-xs font-semibold text-muted-foreground hover:text-foreground"
+            onClick={() => setMoreNutrients((v) => !v)}
+          >
+            {moreNutrients ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+            {moreNutrients ? 'Fewer nutrients' : 'View more nutrients'}
+          </button>
         </CardContent>
       </Card>
 
@@ -163,8 +309,9 @@ export default function FoodPage() {
             <Sparkles className={cn('size-4', busy && 'animate-pulse')} />
           </button>
           <input
+            ref={inputRef}
             className="min-w-0 flex-1 bg-transparent text-[15px] text-[var(--text-strong)] outline-none placeholder:text-[var(--text-subtle)]"
-            placeholder='What did you eat — "2 rotis and dal, 100g paneer"'
+            placeholder='What did you eat — "2 rotis and dal, 100g chicken"'
             value={text}
             disabled={busy}
             onChange={(e) => setText(e.target.value)}
@@ -193,6 +340,14 @@ export default function FoodPage() {
             }}
           />
         </div>
+        {pendingMealType && (
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            Adding to <span className="font-semibold text-[var(--text-strong)]">{MEAL_META[pendingMealType].label}</span>
+            <button type="button" aria-label="Cancel" onClick={() => setPendingMealType(null)}>
+              <X className="size-3" />
+            </button>
+          </p>
+        )}
         {image && (
           <div className="flex items-center gap-2">
             <img src={image.previewUrl} alt="Food" className="h-12 w-12 rounded-lg object-cover ring-1 ring-border" />
@@ -213,108 +368,78 @@ export default function FoodPage() {
         {notice && <p className="text-xs text-muted-foreground">{notice}</p>}
       </div>
 
-      {/* Today's meals, grouped by meal of day */}
-      <div className="space-y-3">
-        {MEAL_ORDER.map((type) => {
-          const group = todayMeals.filter((m) => mealTypeOf(m) === type)
-          if (group.length === 0) return null
-          const groupCalories = group.reduce((s, m) => s + m.calories, 0)
-          return (
-            <section key={type} className="space-y-1.5">
-              <div className="flex items-baseline justify-between px-1">
-                <h2 className="text-xs font-bold tracking-wide text-muted-foreground uppercase">{MEAL_LABEL[type]}</h2>
-                <span className="font-mono text-xs font-semibold tabular-nums text-muted-foreground">{groupCalories} kcal</span>
-              </div>
-              {group.map((meal: Meal) => (
-                <Card key={meal.id}>
-                  <CardContent className="flex items-start gap-3 py-3">
-                    <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setEditing(meal)}>
-                      <p className="text-sm font-semibold text-[var(--text-strong)]">{meal.description}</p>
-                      <p className="text-xs text-muted-foreground">{meal.items.map((i) => i.name).join(' · ')}</p>
-                    </button>
-                    <div className="shrink-0 text-right">
-                      <p className="font-mono text-sm font-bold tabular-nums">{meal.calories} kcal</p>
-                      <p className="text-xs text-muted-foreground">{meal.proteinG}g protein</p>
-                    </div>
-                    <button
-                      type="button"
-                      aria-label="Delete meal"
-                      className="mt-0.5 shrink-0 rounded-full p-1 text-muted-foreground hover:text-red-600"
-                      onClick={() => removeMeal(meal)}
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  </CardContent>
-                </Card>
-              ))}
-            </section>
-          )
-        })}
-        {todayMeals.length === 0 && (
-          <p className="py-6 text-center text-sm text-muted-foreground">Nothing logged today — type what you ate above.</p>
-        )}
-      </div>
+      {/* Meal sections */}
+      {MEAL_ORDER.map((type) => {
+        const meta = MEAL_META[type]
+        const group = todayMeals.filter((m) => mealTypeOf(m) === type)
+        const groupCalories = group.reduce((s, m) => s + m.calories, 0)
+        const isCollapsed = collapsed.has(type)
+        return (
+          <section key={type} className="space-y-1.5">
+            <button
+              type="button"
+              className="flex w-full items-center gap-2.5 px-1"
+              onClick={() =>
+                setCollapsed((prev) => {
+                  const next = new Set(prev)
+                  if (next.has(type)) next.delete(type)
+                  else next.add(type)
+                  return next
+                })
+              }
+            >
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--emerald-100)] text-[var(--emerald-700)]">
+                <meta.icon className="size-4" />
+              </span>
+              <span className="flex-1 text-left text-sm font-bold text-[var(--text-strong)]">{meta.label}</span>
+              {groupCalories > 0 && (
+                <span className="font-mono text-sm font-bold tabular-nums text-[var(--text-strong)]">{groupCalories} kcal</span>
+              )}
+              {isCollapsed ? (
+                <ChevronDown className="size-4 text-muted-foreground" />
+              ) : (
+                <ChevronUp className="size-4 text-muted-foreground" />
+              )}
+            </button>
+
+            {!isCollapsed && (
+              <>
+                {group.map((meal: Meal) => (
+                  <Card key={meal.id}>
+                    <CardContent className="flex items-start gap-3 py-3">
+                      <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setEditing(meal)}>
+                        <p className="text-sm font-semibold text-[var(--text-strong)]">{meal.description}</p>
+                        <p className="text-xs text-muted-foreground">{meal.items.map((i) => i.name).join(' · ')}</p>
+                      </button>
+                      <div className="shrink-0 text-right">
+                        <p className="font-mono text-sm font-bold tabular-nums">{meal.calories} kcal</p>
+                        <p className="text-xs text-muted-foreground">{meal.proteinG}g protein</p>
+                      </div>
+                      <button
+                        type="button"
+                        aria-label="Delete meal"
+                        className="mt-0.5 shrink-0 rounded-full p-1 text-muted-foreground hover:text-red-600"
+                        onClick={() => removeMeal(meal)}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </CardContent>
+                  </Card>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => addTo(type)}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-[var(--radius-lg)] border border-dashed border-[var(--border-default)] py-2.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
+                >
+                  <Plus className="size-3.5" /> Add {group.length > 0 ? 'more ' : ''}food
+                </button>
+              </>
+            )}
+          </section>
+        )
+      })}
 
       <MealEditDialog meal={editing} onClose={() => setEditing(null)} />
-
-      {/* Targets */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Daily targets</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {editingTargets || !targets ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <Input
-                className="w-28"
-                type="number"
-                placeholder="kcal"
-                value={calInput}
-                onChange={(e) => setCalInput(e.target.value)}
-              />
-              <Input
-                className="w-28"
-                type="number"
-                placeholder="protein g"
-                value={proteinInput}
-                onChange={(e) => setProteinInput(e.target.value)}
-              />
-              <Button
-                size="sm"
-                disabled={!Number(calInput) || !Number(proteinInput)}
-                onClick={() => {
-                  setTargets({ calories: Math.round(Number(calInput)), proteinG: Math.round(Number(proteinInput)) })
-                  setEditingTargets(false)
-                  setNotice('Targets saved.')
-                }}
-              >
-                Save
-              </Button>
-              <Button size="sm" variant="outline" disabled={suggesting || !hasAiKey()} onClick={() => void suggest()}>
-                {suggesting ? 'Thinking…' : 'Suggest with AI'}
-              </Button>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                {targets.calories} kcal · {targets.proteinG}g protein
-                {targets.rationale ? <span className="block text-xs">{targets.rationale}</span> : null}
-              </p>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  setCalInput(String(targets.calories))
-                  setProteinInput(String(targets.proteinG))
-                  setEditingTargets(true)
-                }}
-              >
-                Edit
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   )
 }
