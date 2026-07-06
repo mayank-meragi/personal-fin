@@ -165,7 +165,7 @@ export default function HubPage() {
             <Link to={workoutLine.to}>{workoutLine.cta}</Link>
           </Button>
         </Card>
-        <QuickEntry />
+        <QuickEntry universal />
       </section>
 
       {/* Recent activity */}

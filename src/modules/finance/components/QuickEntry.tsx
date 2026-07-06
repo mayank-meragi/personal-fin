@@ -18,6 +18,9 @@ import { hasAiKey, parseWithAi, AiError, NoAiKeyError } from '@/lib/ai'
 import { quickParse } from '@/lib/quickParse'
 import { accountBalances, accountTypeEmoji, inferAccount } from '@/lib/accounts'
 import { AI_MEMORY_PATH, emptyAiMemory, maybeRefreshAiMemory, type AiMemoryFile } from '@/lib/aiMemory'
+import { routeEntry } from '@/lib/entryRouter'
+import { saveSession } from '@/modules/fitness/lib/data'
+import { saveMeal, saveMetric, saveSleep } from '@/modules/health/lib/data'
 import { groupedCategories } from '@/lib/categories'
 import { categoryColor, categoryIcon, TRANSFER_COLOR } from '@/lib/categoryIcon'
 import { todayISO } from '@/lib/dates'
@@ -35,7 +38,13 @@ const typeChip: Record<TransactionType, { label: string; icon: typeof TrendingDo
 const chipClass =
   'h-7 rounded-full border-0 bg-background px-2 text-[11px] font-medium text-foreground shadow-xs ring-1 ring-border outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50'
 
-export default function QuickEntry() {
+interface Props {
+  /** Hub mode: classify the entry first and route food/workout/sleep/weight to
+   * their modules; money falls through to the normal finance flow. */
+  universal?: boolean
+}
+
+export default function QuickEntry({ universal = false }: Props) {
   const { categories, addCategory } = useCategories()
   const { accounts } = useAccounts()
   const { transactions: history } = useAllTransactions()
@@ -120,6 +129,41 @@ export default function QuickEntry() {
     if ((!input && !image) || parsing) return
     setParsing(true)
     setNotice(null)
+
+    // Hub mode: one input for every module — route non-money kinds directly
+    if (universal) {
+      try {
+        const routed = await routeEntry(input, image ? { mimeType: image.mimeType, data: image.data } : undefined)
+        if (routed.kind !== 'money') {
+          switch (routed.kind) {
+            case 'food':
+              saveMeal(queryClient, routed.meal)
+              setNotice(`Logged food: ${routed.meal.calories} kcal · ${routed.meal.proteinG}g protein`)
+              break
+            case 'workout':
+              saveSession(queryClient, routed.session)
+              setNotice(`Logged workout: ${routed.session.exercises.map((e) => e.name).join(', ')}`)
+              break
+            case 'sleep':
+              saveSleep(queryClient, routed.entry)
+              setNotice(`Logged sleep: ${routed.entry.hours}h`)
+              break
+            case 'weight':
+              saveMetric(queryClient, routed.metric)
+              setNotice(`Logged weight: ${routed.metric.weightKg} kg`)
+              break
+          }
+          setText('')
+          clearImage()
+          setParsing(false)
+          return
+        }
+        // money → fall through to the full finance flow below
+      } catch {
+        // Routing failed — treat it as money; the finance flow has its own fallbacks
+      }
+    }
+
     try {
       const result = withInferredAccounts(
         await parseWithAi(input, categories, accounts, {
@@ -250,7 +294,13 @@ export default function QuickEntry() {
         </button>
         <input
           className="min-w-0 flex-1 bg-transparent text-[15px] text-[var(--text-strong)] outline-none placeholder:text-[var(--text-subtle)]"
-          placeholder={hasAiKey() ? 'Add anything — "auto 85", "23k left in hdfc"…' : 'Add anything — "tea 10"…'}
+          placeholder={
+            universal
+              ? 'Add anything — "auto 85", "2 rotis", "slept 11 to 7"…'
+              : hasAiKey()
+                ? 'Add anything — "auto 85", "23k left in hdfc"…'
+                : 'Add anything — "tea 10"…'
+          }
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
