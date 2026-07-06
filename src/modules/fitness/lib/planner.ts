@@ -314,9 +314,11 @@ export async function generateFitnessMemory(previous: string, recent: WorkoutSes
   const today = todayISO()
   const text = await generateJson({
     text: `You keep a personal trainer's compact notes about a client, injected into future workout
-programming. Rewrite them to include the newest sessions. Under 120 words, plain "- " bullets.
-Keep only durable knowledge: working weights on key lifts, exercises they skip or struggle with,
-pace of progression, schedule patterns. Never invent facts.
+programming. Rewrite them to include the newest sessions. Under 150 words, plain "- " bullets.
+Keep durable knowledge: working weights on key lifts, exercises they skip or struggle with,
+pace of progression, schedule patterns. PERMANENT client facts already in the notes (age, body
+weight, injuries, sport background, goals) must survive every rewrite — never drop them.
+Never invent facts.
 
 Previous notes:
 ${previous || '(none)'}

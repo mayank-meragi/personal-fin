@@ -16,6 +16,7 @@ import { savePlan, saveProfile, useAllWorkouts, usePlan, useProfile } from '../l
 import { generateNextWorkout } from '../lib/planner'
 import { daysSince, lastSessionDate, setSummary } from '../lib/stats'
 import type { FitnessMemoryFile, FitnessProfile } from '../lib/types'
+import SetupChat from '../components/SetupChat'
 
 const GOALS: { id: FitnessProfile['goal']; label: string }[] = [
   { id: 'build-muscle', label: 'Build muscle' },
@@ -131,6 +132,7 @@ export default function PlanPage() {
   const { sessions } = useAllWorkouts()
   const { data: exercises } = useExercises()
   const [editing, setEditing] = useState(false)
+  const [manualSetup, setManualSetup] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -162,6 +164,23 @@ export default function PlanPage() {
     return <p className="py-8 text-center text-sm text-muted-foreground">Loading…</p>
   }
 
+  // First run: the AI trainer interviews you once; manual form as fallback/edit path
+  if (!profile && !manualSetup && hasAiKey()) {
+    return (
+      <div className="space-y-3">
+        <h1 className="text-xl font-semibold tracking-tight">Plan</h1>
+        <SetupChat onDone={() => setManualSetup(false)} />
+        <button
+          type="button"
+          className="w-full text-center text-xs text-muted-foreground underline underline-offset-4"
+          onClick={() => setManualSetup(true)}
+        >
+          Fill the form manually instead
+        </button>
+      </div>
+    )
+  }
+
   if (!profile || editing) {
     return (
       <div className="space-y-3">
@@ -171,6 +190,7 @@ export default function PlanPage() {
           onSave={(p) => {
             saveProfile(qc, p)
             setEditing(false)
+            setManualSetup(false)
           }}
         />
       </div>
