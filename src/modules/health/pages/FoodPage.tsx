@@ -11,9 +11,17 @@ import { getCachedFile } from '@/lib/cache'
 import { FITNESS_PATHS } from '@/lib/paths'
 import type { FitnessMemoryFile, FitnessProfile } from '@/modules/fitness/lib/types'
 import { saveMeal, useMealsMonth, useMetrics, useTargets } from '../lib/data'
-import { parseMeal, suggestTargets } from '../lib/nutrition'
-import type { Meal } from '../lib/types'
+import { inferMealType, parseMeal, suggestTargets } from '../lib/nutrition'
+import type { Meal, MealType } from '../lib/types'
 import { useHealthMutations } from '../lib/data'
+
+const MEAL_ORDER: MealType[] = ['breakfast', 'lunch', 'snack', 'dinner']
+const MEAL_LABEL: Record<MealType, string> = { breakfast: 'Breakfast', lunch: 'Lunch', snack: 'Snacks', dinner: 'Dinner' }
+
+/** Older meals predate mealType — infer from when they were logged. */
+function mealTypeOf(meal: Meal): MealType {
+  return meal.mealType ?? inferMealType(new Date(meal.createdAt))
+}
 
 function MacroBar({ label, value, target, unit }: { label: string; value: number; target?: number; unit: string }) {
   const pct = target ? Math.min((value / target) * 100, 100) : 0
@@ -203,33 +211,43 @@ export default function FoodPage() {
         {notice && <p className="text-xs text-muted-foreground">{notice}</p>}
       </div>
 
-      {/* Today's meals */}
-      <div className="space-y-2">
-        {todayMeals
-          .slice()
-          .reverse()
-          .map((meal: Meal) => (
-            <Card key={meal.id}>
-              <CardContent className="flex items-start gap-3 py-3">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-[var(--text-strong)]">{meal.description}</p>
-                  <p className="text-xs text-muted-foreground">{meal.items.map((i) => i.name).join(' · ')}</p>
-                </div>
-                <div className="shrink-0 text-right">
-                  <p className="font-mono text-sm font-bold tabular-nums">{meal.calories} kcal</p>
-                  <p className="text-xs text-muted-foreground">{meal.proteinG}g protein</p>
-                </div>
-                <button
-                  type="button"
-                  aria-label="Delete meal"
-                  className="mt-0.5 shrink-0 rounded-full p-1 text-muted-foreground hover:text-red-600"
-                  onClick={() => removeMeal(meal)}
-                >
-                  <Trash2 className="size-3.5" />
-                </button>
-              </CardContent>
-            </Card>
-          ))}
+      {/* Today's meals, grouped by meal of day */}
+      <div className="space-y-3">
+        {MEAL_ORDER.map((type) => {
+          const group = todayMeals.filter((m) => mealTypeOf(m) === type)
+          if (group.length === 0) return null
+          const groupCalories = group.reduce((s, m) => s + m.calories, 0)
+          return (
+            <section key={type} className="space-y-1.5">
+              <div className="flex items-baseline justify-between px-1">
+                <h2 className="text-xs font-bold tracking-wide text-muted-foreground uppercase">{MEAL_LABEL[type]}</h2>
+                <span className="font-mono text-xs font-semibold tabular-nums text-muted-foreground">{groupCalories} kcal</span>
+              </div>
+              {group.map((meal: Meal) => (
+                <Card key={meal.id}>
+                  <CardContent className="flex items-start gap-3 py-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-[var(--text-strong)]">{meal.description}</p>
+                      <p className="text-xs text-muted-foreground">{meal.items.map((i) => i.name).join(' · ')}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="font-mono text-sm font-bold tabular-nums">{meal.calories} kcal</p>
+                      <p className="text-xs text-muted-foreground">{meal.proteinG}g protein</p>
+                    </div>
+                    <button
+                      type="button"
+                      aria-label="Delete meal"
+                      className="mt-0.5 shrink-0 rounded-full p-1 text-muted-foreground hover:text-red-600"
+                      onClick={() => removeMeal(meal)}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </CardContent>
+                </Card>
+              ))}
+            </section>
+          )
+        })}
         {todayMeals.length === 0 && (
           <p className="py-6 text-center text-sm text-muted-foreground">Nothing logged today — type what you ate above.</p>
         )}

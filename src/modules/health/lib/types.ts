@@ -17,11 +17,15 @@ export interface MealItem {
   fatG?: number
 }
 
+export type MealType = 'breakfast' | 'lunch' | 'snack' | 'dinner'
+
 export interface Meal {
   id: string
   /** YYYY-MM-DD */
   date: string
   createdAt: string
+  /** stated by the user or inferred from log time */
+  mealType?: MealType
   /** what the user typed/photographed, e.g. "2 rotis and dal" */
   description: string
   items: MealItem[]

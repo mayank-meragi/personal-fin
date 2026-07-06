@@ -1,11 +1,25 @@
 import { AiError, generateJson, type ImageAttachment } from '@/lib/llm'
 import { todayISO } from '@/lib/dates'
 import type { FitnessProfile } from '@/modules/fitness/lib/types'
-import type { Meal, MealItem, NutritionTargets } from './types'
+import type { Meal, MealItem, MealType, NutritionTargets } from './types'
+
+/** When the user didn't name the meal, the clock does: 1:30 PM is lunch. */
+export function inferMealType(when: Date = new Date()): MealType {
+  const hour = when.getHours()
+  if (hour < 11) return 'breakfast'
+  if (hour < 15) return 'lunch'
+  if (hour < 18) return 'snack'
+  return 'dinner'
+}
 
 const MEAL_SCHEMA = {
   type: 'object',
   properties: {
+    mealType: {
+      type: 'string',
+      enum: ['breakfast', 'lunch', 'snack', 'dinner'],
+      description: 'ONLY when the user names it ("lunch...", "for breakfast"); omit otherwise',
+    },
     items: {
       type: 'array',
       items: {
@@ -36,7 +50,8 @@ Rules:
 - Use realistic Indian home-cooking portions when unstated: 1 roti ~100 kcal, 1 katori dal ~150 kcal,
   1 plate rice ~250 kcal, 100g paneer ~290 kcal. A photo shows the actual portion — estimate from it.
 - calories and proteinG are for the TOTAL stated quantity, not per unit. Round sensibly.
-- Be realistic, not optimistic; restaurant/fried versions have more oil.`,
+- Be realistic, not optimistic; restaurant/fried versions have more oil.
+- Set mealType only when the user names it ("lunch…", "for breakfast", "evening snack").`,
     text: input || 'Estimate the nutrition in the attached food photo.',
     image,
     schema: MEAL_SCHEMA,
@@ -44,7 +59,7 @@ Rules:
     maxOutputTokens: 2048,
   })
 
-  let raw: { items?: Partial<MealItem>[] }
+  let raw: { mealType?: MealType; items?: Partial<MealItem>[] }
   try {
     raw = JSON.parse(text)
   } catch {
@@ -66,6 +81,7 @@ Rules:
     id: crypto.randomUUID(),
     date: todayISO(),
     createdAt: new Date().toISOString(),
+    mealType: ['breakfast', 'lunch', 'snack', 'dinner'].includes(raw.mealType ?? '') ? raw.mealType : inferMealType(),
     description: input || 'photo meal',
     items,
     calories: sum((i) => i.calories),
