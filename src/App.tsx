@@ -8,6 +8,7 @@ import BudgetsPage from './pages/BudgetsPage'
 import CategoriesPage from './pages/CategoriesPage'
 import ImportPage from './pages/ImportPage'
 import SettingsPage from './pages/SettingsPage'
+import Assistant from './components/Assistant'
 import Onboarding from './components/Onboarding'
 import AccountSetup from './components/AccountSetup'
 import SyncStatus from './components/SyncStatus'
@@ -98,6 +99,7 @@ export default function App() {
             <Route path="/categories" element={<CategoriesPage />} />
           </Routes>
         </main>
+        <Assistant />
         <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-20 px-8 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] md:hidden">
           <div className="pointer-events-auto mx-auto flex max-w-xs items-center justify-between rounded-full bg-card p-1.5 shadow-[0_8px_30px_-8px_oklch(0.3_0.055_279/0.35)] ring-1 ring-foreground/[0.06]">
             {navItems.map((item) => (

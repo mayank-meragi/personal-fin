@@ -116,7 +116,12 @@ function buildResponseSchema(accounts: Account[]) {
   }
 }
 
-async function callGemini(body: object): Promise<string> {
+/** One content part in a Gemini request/response (text, functionCall, functionResponse, …). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type GeminiPart = Record<string, any>
+
+/** Raw Gemini call returning the candidate's parts — used for function calling. */
+export async function callGeminiParts(body: object): Promise<GeminiPart[]> {
   const key = getConfig('geminiKey')
   if (!key) throw new NoGeminiKeyError('No Gemini API key configured')
   let res: Response
@@ -125,12 +130,12 @@ async function callGemini(body: object): Promise<string> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify(body),
-      // A runaway generation otherwise leaves the UI in "Parsing…" forever
+      // A runaway generation otherwise leaves the UI stuck forever
       signal: AbortSignal.timeout(30_000),
     })
   } catch (e) {
     if (e instanceof DOMException && (e.name === 'TimeoutError' || e.name === 'AbortError')) {
-      throw new GeminiError('Gemini took too long — tried simple parsing instead.')
+      throw new GeminiError('Gemini took too long — try again.')
     }
     throw new GeminiError('Gemini unreachable — are you offline?')
   }
@@ -142,7 +147,14 @@ async function callGemini(body: object): Promise<string> {
   }
   if (!res.ok) throw new GeminiError(`Gemini returned ${res.status}`)
   const json = await res.json()
-  const text: string | undefined = json.candidates?.[0]?.content?.parts?.[0]?.text
+  const parts: GeminiPart[] | undefined = json.candidates?.[0]?.content?.parts
+  if (!parts || parts.length === 0) throw new GeminiError('Gemini returned no content')
+  return parts
+}
+
+async function callGemini(body: object): Promise<string> {
+  const parts = await callGeminiParts(body)
+  const text = parts.find((p) => typeof p.text === 'string')?.text as string | undefined
   if (!text) throw new GeminiError('Gemini returned no content')
   return text
 }

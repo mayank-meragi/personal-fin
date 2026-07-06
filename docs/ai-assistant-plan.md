@@ -84,4 +84,5 @@ and become thin wrappers. No behavior change.
 
 - Placement: **floating button + chat sheet** on every screen; Quick Add unchanged
 - Write policy: **apply immediately + Undo** per action; deletes need an in-chat confirm tap
-- Status: plan under review — Phase 1 build not started yet
+- Status: **Phase 1 shipped** (agent core, tool surface, chat sheet, undo, confirm-on-delete).
+  Next: Phase 2 (page-awareness context, persisted transcript, richer cross-month queries).
