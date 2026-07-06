@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
-import { ArrowLeftRight, Dumbbell, Sparkles } from 'lucide-react'
+import { ArrowLeftRight, Dumbbell } from 'lucide-react'
+import QuickEntry from '@/modules/finance/components/QuickEntry'
 import { Amount } from '@/components/Amount'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -158,14 +159,7 @@ export default function HubPage() {
             <Link to={workoutLine.to}>{workoutLine.cta}</Link>
           </Button>
         </Card>
-        <Link to="/finance" className="block">
-          <Card className="flex-row items-center gap-3 p-3.5 transition-transform active:scale-[0.99]">
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-100)] text-[var(--emerald-700)]">
-              <Sparkles className="size-5" />
-            </span>
-            <p className="flex-1 text-sm text-[var(--text-subtle)]">Add a transaction…</p>
-          </Card>
-        </Link>
+        <QuickEntry />
       </section>
 
       {/* Recent activity */}
