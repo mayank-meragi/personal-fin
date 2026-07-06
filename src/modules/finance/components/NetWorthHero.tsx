@@ -1,7 +1,7 @@
 import { ChevronUp, ChevronDown } from 'lucide-react'
 import { Area, AreaChart, ResponsiveContainer, YAxis } from 'recharts'
 import { Card } from '@/components/ui/card'
-import { Amount } from './Amount'
+import { Amount } from '@/components/Amount'
 
 interface Props {
   totalBalance: number

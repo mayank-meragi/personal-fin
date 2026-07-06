@@ -1,4 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query'
+import { FINANCE_PATHS } from './paths'
 import { updateFile } from './sync'
 import { fileQueryKey } from './queryKeys'
 import { monthKey, transactionsPath } from './dates'
@@ -56,11 +57,11 @@ export function deleteTransaction(qc: QueryClient, tx: Transaction) {
 }
 
 export function addCategory(qc: QueryClient, category: Category) {
-  const next = updateFile<CategoriesFile>('categories.json', defaultCategories, (current) => {
+  const next = updateFile<CategoriesFile>(FINANCE_PATHS.categories, defaultCategories, (current) => {
     if (current.categories.some((c) => c.id === category.id)) return current
     return { ...current, categories: [...current.categories, category] }
   })
-  qc.setQueryData(fileQueryKey('categories.json'), next)
+  qc.setQueryData(fileQueryKey(FINANCE_PATHS.categories), next)
 }
 
 export function updateCategory(
@@ -68,22 +69,22 @@ export function updateCategory(
   id: string,
   patch: Partial<Pick<Category, 'name' | 'emoji' | 'hints' | 'savings'>>,
 ) {
-  const next = updateFile<CategoriesFile>('categories.json', defaultCategories, (current) => ({
+  const next = updateFile<CategoriesFile>(FINANCE_PATHS.categories, defaultCategories, (current) => ({
     ...current,
     categories: current.categories.map((c) => (c.id === id ? { ...c, ...patch } : c)),
   }))
-  qc.setQueryData(fileQueryKey('categories.json'), next)
+  qc.setQueryData(fileQueryKey(FINANCE_PATHS.categories), next)
 }
 
 /** Removes a category (and orphans its children to top level). Used for undo. */
 export function removeCategory(qc: QueryClient, id: string) {
-  const next = updateFile<CategoriesFile>('categories.json', defaultCategories, (current) => ({
+  const next = updateFile<CategoriesFile>(FINANCE_PATHS.categories, defaultCategories, (current) => ({
     ...current,
     categories: current.categories
       .filter((c) => c.id !== id)
       .map((c) => (c.parent === id ? { ...c, parent: undefined } : c)),
   }))
-  qc.setQueryData(fileQueryKey('categories.json'), next)
+  qc.setQueryData(fileQueryKey(FINANCE_PATHS.categories), next)
 }
 
 /**
@@ -98,7 +99,7 @@ export function setBudgetLimit(
   month?: string,
 ): number | null {
   let previous: number | null = null
-  const next = updateFile<BudgetsFile>('budgets.json', emptyBudgets, (current) => {
+  const next = updateFile<BudgetsFile>(FINANCE_PATHS.budgets, emptyBudgets, (current) => {
     if (month) {
       previous = current.overrides[month]?.[categoryId] ?? null
       const monthOverrides = { ...(current.overrides[month] ?? {}) }
@@ -112,16 +113,16 @@ export function setBudgetLimit(
     else monthlyLimits[categoryId] = limit
     return { ...current, monthlyLimits }
   })
-  qc.setQueryData(fileQueryKey('budgets.json'), next)
+  qc.setQueryData(fileQueryKey(FINANCE_PATHS.budgets), next)
   return previous
 }
 
 export function addAccounts(qc: QueryClient, accounts: Account[]) {
-  const next = updateFile<AccountsFile>('accounts.json', emptyAccounts, (current) => ({
+  const next = updateFile<AccountsFile>(FINANCE_PATHS.accounts, emptyAccounts, (current) => ({
     ...current,
     accounts: [...current.accounts, ...accounts.filter((a) => !current.accounts.some((c) => c.id === a.id))],
   }))
-  qc.setQueryData(fileQueryKey('accounts.json'), next)
+  qc.setQueryData(fileQueryKey(FINANCE_PATHS.accounts), next)
 }
 
 export function updateAccount(
@@ -129,18 +130,18 @@ export function updateAccount(
   id: string,
   patch: Partial<Pick<Account, 'name' | 'startingBalance' | 'type'>>,
 ) {
-  const next = updateFile<AccountsFile>('accounts.json', emptyAccounts, (current) => ({
+  const next = updateFile<AccountsFile>(FINANCE_PATHS.accounts, emptyAccounts, (current) => ({
     ...current,
     accounts: current.accounts.map((a) => (a.id === id ? { ...a, ...patch } : a)),
   }))
-  qc.setQueryData(fileQueryKey('accounts.json'), next)
+  qc.setQueryData(fileQueryKey(FINANCE_PATHS.accounts), next)
 }
 
 /** Removes an account (transactions keep their account id). Used for undo. */
 export function removeAccount(qc: QueryClient, id: string) {
-  const next = updateFile<AccountsFile>('accounts.json', emptyAccounts, (current) => ({
+  const next = updateFile<AccountsFile>(FINANCE_PATHS.accounts, emptyAccounts, (current) => ({
     ...current,
     accounts: current.accounts.filter((a) => a.id !== id),
   }))
-  qc.setQueryData(fileQueryKey('accounts.json'), next)
+  qc.setQueryData(fileQueryKey(FINANCE_PATHS.accounts), next)
 }

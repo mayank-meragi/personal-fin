@@ -8,11 +8,11 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { formatINR, formatINRCompact } from '../lib/money'
-import { monthLabel } from '../lib/dates'
-import { palette } from '../lib/palette'
-import { totals } from '../lib/stats'
-import type { Transaction } from '../lib/types'
+import { formatINR, formatINRCompact } from '@/lib/money'
+import { monthLabel } from '@/lib/dates'
+import { palette } from '@/lib/palette'
+import { totals } from '@/lib/stats'
+import type { Transaction } from '@/lib/types'
 
 interface Props {
   /** month key → transactions, in chronological order */

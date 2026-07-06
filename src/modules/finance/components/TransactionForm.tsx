@@ -19,11 +19,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-import { useAccounts, useCategories } from '../hooks/useData'
-import { groupedCategories } from '../lib/categories'
-import { makeTransaction } from '../hooks/useTransactions'
-import { todayISO } from '../lib/dates'
-import type { Transaction, TransactionType } from '../lib/types'
+import { useAccounts, useCategories } from '@/hooks/useData'
+import { groupedCategories } from '@/lib/categories'
+import { makeTransaction } from '@/hooks/useTransactions'
+import { todayISO } from '@/lib/dates'
+import type { Transaction, TransactionType } from '@/lib/types'
 
 interface Props {
   /** When set, the form edits this transaction instead of creating one */

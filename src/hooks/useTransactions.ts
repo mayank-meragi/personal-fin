@@ -1,10 +1,11 @@
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getCachedFile, isConfigured } from '../lib/cache'
-import { listDir } from '../lib/github'
-import { loadFile } from '../lib/sync'
-import * as actions from '../lib/actions'
-import { currentMonthKey, transactionsPath } from '../lib/dates'
-import type { Transaction } from '../lib/types'
+import { getCachedFile, isConfigured } from '@/lib/cache'
+import { listDir } from '@/lib/github'
+import { FINANCE_PATHS } from '@/lib/paths'
+import { loadFile } from '@/lib/sync'
+import * as actions from '@/lib/actions'
+import { currentMonthKey, transactionsPath } from '@/lib/dates'
+import type { Transaction } from '@/lib/types'
 import { fileQueryKey, useFileQuery } from './useData'
 
 const empty: Transaction[] = []
@@ -22,7 +23,7 @@ export function useAllTransactions(): { transactions: Transaction[]; isReady: bo
   const monthsQuery = useQuery({
     queryKey: ['transaction-months'],
     queryFn: async () => {
-      const files = await listDir('transactions')
+      const files = await listDir(FINANCE_PATHS.transactionsDir)
       return files
         .map((f) => f.name.replace(/\.json$/, ''))
         .filter((name) => /^\d{4}-\d{2}$/.test(name))

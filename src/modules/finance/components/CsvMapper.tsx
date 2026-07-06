@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils'
-import { extractRows, type ColumnMapping, type DateFormat, type RawCsv } from '../lib/csv'
-import { formatINRExact } from '../lib/money'
+import { extractRows, type ColumnMapping, type DateFormat, type RawCsv } from '@/lib/csv'
+import { formatINRExact } from '@/lib/money'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 

@@ -1,11 +1,11 @@
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Amount } from './Amount'
+import { Amount } from '@/components/Amount'
 import { ArrowLeftRight, Pencil, Trash2 } from 'lucide-react'
-import { useAccounts, useCategories } from '../hooks/useData'
-import { categoryDisplayName } from '../lib/categories'
-import { categoryColor, categoryIcon, TRANSFER_COLOR } from '../lib/categoryIcon'
-import type { Transaction } from '../lib/types'
+import { useAccounts, useCategories } from '@/hooks/useData'
+import { categoryDisplayName } from '@/lib/categories'
+import { categoryColor, categoryIcon, TRANSFER_COLOR } from '@/lib/categoryIcon'
+import type { Transaction } from '@/lib/types'
 
 interface Props {
   transactions: Transaction[]

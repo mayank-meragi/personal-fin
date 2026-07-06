@@ -2,10 +2,10 @@ import { CalendarClock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { makeTransaction, useTransactionMutations } from '../hooks/useTransactions'
-import { todayISO } from '../lib/dates'
-import { formatINR } from '../lib/money'
-import type { UpcomingBill } from '../lib/recurring'
+import { makeTransaction, useTransactionMutations } from '@/hooks/useTransactions'
+import { todayISO } from '@/lib/dates'
+import { formatINR } from '@/lib/money'
+import type { UpcomingBill } from '@/lib/recurring'
 
 interface Props {
   bills: UpcomingBill[]

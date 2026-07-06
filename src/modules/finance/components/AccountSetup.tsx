@@ -5,10 +5,10 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
-import { makeAccountId, useAccounts } from '../hooks/useData'
-import { accountTypeEmoji, accountTypeLabel } from '../lib/accounts'
-import { formatINRExact } from '../lib/money'
-import type { Account, AccountType } from '../lib/types'
+import { makeAccountId, useAccounts } from '@/hooks/useData'
+import { accountTypeEmoji, accountTypeLabel } from '@/lib/accounts'
+import { formatINRExact } from '@/lib/money'
+import type { Account, AccountType } from '@/lib/types'
 
 /**
  * First-run screen after connecting: add at least one account (bank, credit

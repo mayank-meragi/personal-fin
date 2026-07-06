@@ -45,5 +45,5 @@ export function addMonths(key: string, delta: number): string {
 }
 
 export function transactionsPath(month: string): string {
-  return `transactions/${month}.json`
+  return `finance/transactions/${month}.json`
 }

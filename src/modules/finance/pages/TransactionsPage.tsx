@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import MonthPicker from '../components/MonthPicker'
-import TransactionForm from '../components/TransactionForm'
-import TransactionList from '../components/TransactionList'
-import { useTransactions, useTransactionMutations } from '../hooks/useTransactions'
-import { currentMonthKey } from '../lib/dates'
-import { formatINR } from '../lib/money'
-import type { Transaction } from '../lib/types'
+import MonthPicker from '@/modules/finance/components/MonthPicker'
+import TransactionForm from '@/modules/finance/components/TransactionForm'
+import TransactionList from '@/modules/finance/components/TransactionList'
+import { useTransactions, useTransactionMutations } from '@/hooks/useTransactions'
+import { currentMonthKey } from '@/lib/dates'
+import { formatINR } from '@/lib/money'
+import type { Transaction } from '@/lib/types'
 
 export default function TransactionsPage() {
   const [month, setMonth] = useState(currentMonthKey())

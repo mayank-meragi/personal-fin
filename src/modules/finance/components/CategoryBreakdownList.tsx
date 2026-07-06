@@ -1,11 +1,11 @@
 import { PiggyBank } from 'lucide-react'
 import { Card } from '@/components/ui/card'
-import { Amount } from './Amount'
-import { categoryDisplayName } from '../lib/categories'
-import { categoryColor, categoryIcon } from '../lib/categoryIcon'
-import { formatINR } from '../lib/money'
-import { spentByCategory } from '../lib/stats'
-import type { Category, Transaction } from '../lib/types'
+import { Amount } from '@/components/Amount'
+import { categoryDisplayName } from '@/lib/categories'
+import { categoryColor, categoryIcon } from '@/lib/categoryIcon'
+import { formatINR } from '@/lib/money'
+import { spentByCategory } from '@/lib/stats'
+import type { Category, Transaction } from '@/lib/types'
 
 interface Props {
   transactions: Transaction[]

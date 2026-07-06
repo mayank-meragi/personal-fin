@@ -7,7 +7,7 @@ import type { Transaction } from './types'
  */
 export function mergeFile(path: string, local: unknown, remote: unknown): unknown {
   if (remote == null) return local
-  if (path.startsWith('transactions/')) {
+  if (/\btransactions\//.test(path)) {
     return mergeTransactions(local as Transaction[], remote as Transaction[])
   }
   if (typeof local === 'object' && typeof remote === 'object' && !Array.isArray(local) && !Array.isArray(remote)) {

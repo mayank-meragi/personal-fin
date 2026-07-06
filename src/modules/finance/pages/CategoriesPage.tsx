@@ -4,11 +4,11 @@ import { ChevronLeft, PiggyBank, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { useCategories } from '../hooks/useData'
-import { groupedCategories } from '../lib/categories'
-import { categoryColor, categoryIcon } from '../lib/categoryIcon'
-import { generateCategories, AiError, hasAiKey, NoAiKeyError } from '../lib/ai'
-import type { Category } from '../lib/types'
+import { useCategories } from '@/hooks/useData'
+import { groupedCategories } from '@/lib/categories'
+import { categoryColor, categoryIcon } from '@/lib/categoryIcon'
+import { generateCategories, AiError, hasAiKey, NoAiKeyError } from '@/lib/ai'
+import type { Category } from '@/lib/types'
 
 /** Toggle chip for a category's spending/savings nature */
 function cnSavings(savings?: boolean): string {

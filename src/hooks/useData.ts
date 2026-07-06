@@ -1,12 +1,13 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getCachedFile, isConfigured } from '../lib/cache'
-import { loadFile } from '../lib/sync'
-import * as actions from '../lib/actions'
-import { defaultCategories } from '../defaults/categories'
-import type { Account, AccountsFile, BudgetsFile, CategoriesFile, Category, SettingsFile } from '../lib/types'
+import { getCachedFile, isConfigured } from '@/lib/cache'
+import { FINANCE_PATHS, SETTINGS_PATH } from '@/lib/paths'
+import { loadFile } from '@/lib/sync'
+import * as actions from '@/lib/actions'
+import { defaultCategories } from '@/defaults/categories'
+import type { Account, AccountsFile, BudgetsFile, CategoriesFile, Category, SettingsFile } from '@/lib/types'
 
-export { fileQueryKey } from '../lib/queryKeys'
-import { fileQueryKey } from '../lib/queryKeys'
+export { fileQueryKey } from '@/lib/queryKeys'
+import { fileQueryKey } from '@/lib/queryKeys'
 
 /** Query a data file: cached copy shows instantly, remote revalidates in background. */
 export function useFileQuery<T>(path: string, fallback: T) {
@@ -23,7 +24,7 @@ export function useFileQuery<T>(path: string, fallback: T) {
 
 export function useCategories() {
   const queryClient = useQueryClient()
-  const { data } = useFileQuery<CategoriesFile>('categories.json', defaultCategories)
+  const { data } = useFileQuery<CategoriesFile>(FINANCE_PATHS.categories, defaultCategories)
   return {
     categories: (data ?? defaultCategories).categories,
     addCategory: (category: Category) => actions.addCategory(queryClient, category),
@@ -36,7 +37,7 @@ const emptyAccounts: AccountsFile = { accounts: [] }
 
 export function useAccounts() {
   const queryClient = useQueryClient()
-  const query = useFileQuery<AccountsFile>('accounts.json', emptyAccounts)
+  const query = useFileQuery<AccountsFile>(FINANCE_PATHS.accounts, emptyAccounts)
   return {
     accounts: query.data?.accounts ?? [],
     /** True once the remote has actually been checked (not just cache/fallback) */
@@ -60,7 +61,7 @@ const emptyBudgets: BudgetsFile = { monthlyLimits: {}, overrides: {} }
 
 export function useBudgets() {
   const queryClient = useQueryClient()
-  const { data } = useFileQuery<BudgetsFile>('budgets.json', emptyBudgets)
+  const { data } = useFileQuery<BudgetsFile>(FINANCE_PATHS.budgets, emptyBudgets)
   return {
     budgets: data ?? emptyBudgets,
     setMonthlyLimit: (categoryId: string, limit: number | null) =>
@@ -76,6 +77,6 @@ export function effectiveLimit(budgets: BudgetsFile, month: string, categoryId: 
 const fallbackSettings: SettingsFile = { schemaVersion: 1, currency: 'INR', startOfMonth: 1 }
 
 export function useSettings(): SettingsFile {
-  const { data } = useFileQuery<SettingsFile>('settings.json', fallbackSettings)
+  const { data } = useFileQuery<SettingsFile>(SETTINGS_PATH, fallbackSettings)
   return data ?? fallbackSettings
 }

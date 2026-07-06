@@ -9,6 +9,7 @@ import {
   isConfigured,
 } from './cache'
 import { mergeFile } from './merge'
+import { FINANCE_PATHS, FITNESS_PATHS, SETTINGS_PATH } from './paths'
 import { defaultCategories } from '../defaults/categories'
 import type { AccountsFile, BudgetsFile, SettingsFile } from './types'
 
@@ -169,15 +170,15 @@ const defaultSettings: SettingsFile = { schemaVersion: 1, currency: 'INR', start
 const defaultAccounts: AccountsFile = { accounts: [] }
 
 export const SEED_FILES: { path: string; content: unknown }[] = [
-  { path: 'categories.json', content: defaultCategories },
-  { path: 'budgets.json', content: defaultBudgets },
-  { path: 'settings.json', content: defaultSettings },
-  { path: 'accounts.json', content: defaultAccounts },
+  { path: FINANCE_PATHS.categories, content: defaultCategories },
+  { path: FINANCE_PATHS.budgets, content: defaultBudgets },
+  { path: SETTINGS_PATH, content: defaultSettings },
+  { path: FINANCE_PATHS.accounts, content: defaultAccounts },
 ]
 
 /** First-run bootstrap: create seed files on the data branch if absent. */
 export async function ensureSeedFiles(): Promise<void> {
-  const existing = await gh.getFile('categories.json')
+  const existing = await gh.getFile(FINANCE_PATHS.categories)
   if (existing !== null) return
   for (const seed of SEED_FILES) {
     const { sha } = await gh.putFile(
@@ -196,12 +197,18 @@ export async function ensureSeedFiles(): Promise<void> {
  * local cache. The data repo's git history still contains the old commits.
  */
 export async function resetAllData(): Promise<void> {
-  const txFiles = await gh.listDir('transactions')
+  const txFiles = await gh.listDir(FINANCE_PATHS.transactionsDir)
   for (const f of txFiles) {
-    await gh.deleteFile(`transactions/${f.name}`, f.sha, `Reset: delete transactions/${f.name}`)
+    await gh.deleteFile(`${FINANCE_PATHS.transactionsDir}/${f.name}`, f.sha, `Reset: delete ${f.name}`)
   }
-  const memory = await gh.getFile('ai-memory.json')
-  if (memory) await gh.deleteFile('ai-memory.json', memory.sha, 'Reset: delete ai-memory.json')
+  const workoutFiles = await gh.listDir(FITNESS_PATHS.workoutsDir)
+  for (const f of workoutFiles) {
+    await gh.deleteFile(`${FITNESS_PATHS.workoutsDir}/${f.name}`, f.sha, `Reset: delete ${f.name}`)
+  }
+  for (const path of [FINANCE_PATHS.aiMemory, FITNESS_PATHS.profile, FITNESS_PATHS.plan, FITNESS_PATHS.memory]) {
+    const file = await gh.getFile(path)
+    if (file) await gh.deleteFile(path, file.sha, `Reset: delete ${path}`)
+  }
   for (const seed of SEED_FILES) {
     const remote = await gh.getFile(seed.path)
     await gh.putFile(seed.path, JSON.stringify(seed.content, null, 2), remote?.sha ?? null, `Reset ${seed.path}`)

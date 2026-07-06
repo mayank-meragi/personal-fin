@@ -4,7 +4,7 @@ import { accountBalances } from './accounts'
 import { generateMemorySummary, hasAiKey } from './ai'
 import type { Account, Category, Transaction } from './types'
 
-export const AI_MEMORY_PATH = 'ai-memory.json'
+export const AI_MEMORY_PATH = 'finance/ai-memory.json'
 
 export interface AiMemoryFile {
   /** Compact bullet-point profile injected into every parse prompt */

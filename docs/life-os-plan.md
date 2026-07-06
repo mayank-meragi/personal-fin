@@ -148,4 +148,9 @@ Each phase builds, screenshots, and works standalone; push whenever you say.
   workouts) and tweak accordingly — ease back in after a gap rather than blindly
   continuing a schedule. The prompt must therefore weight "time since last session"
   and adherence, not just progression.
-- Status: planned, not yet implemented.
+- Status: **implemented locally** (all 5 phases). Verified: build + full test suite green,
+  live Gemini runs (first-workout generation honoring an injury, 12-day-gap comeback at
+  ~85% load with full-body fallback, quick-log parse, agent log_workout), screenshots of
+  hub/fitness/finance against live data. Finance data COPIED to `finance/` in the repo;
+  root originals still present — on deploy, re-run the copy for changed files and delete
+  the root originals (`/tmp/pf-migrate.sh` pattern), then push.

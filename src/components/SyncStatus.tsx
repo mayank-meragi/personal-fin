@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import { useSyncState } from '../hooks/useSyncState'
-import { flush } from '../lib/sync'
+import { useSyncState } from '@/hooks/useSyncState'
+import { flush } from '@/lib/sync'
 
 const styles: Record<string, { label: string; className: string }> = {
   idle: { label: 'Synced', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },

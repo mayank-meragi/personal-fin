@@ -7,7 +7,15 @@ import { currentMonthKey, todayISO, transactionsPath } from '../dates'
 import { fileQueryKey } from '../queryKeys'
 import { splitSpendingSavings, totals } from '../stats'
 import { toKebabId } from '../ai'
+import { FINANCE_PATHS, FITNESS_PATHS } from '../paths'
+import { listDir } from '../github'
+import { loadFile } from '../sync'
 import type { ToolDef } from '../llm'
+import { fetchExercises } from '@/modules/fitness/lib/exerciseDb'
+import { deleteSession, savePlan, saveSession } from '@/modules/fitness/lib/data'
+import { generateNextWorkout, parseQuickLog } from '@/modules/fitness/lib/planner'
+import { sessionVolume, setSummary } from '@/modules/fitness/lib/stats'
+import type { FitnessProfile, PlanFile, WorkoutSession } from '@/modules/fitness/lib/types'
 import type {
   Account,
   AccountsFile,
@@ -40,11 +48,11 @@ function readFile<T>(qc: QueryClient, path: string, fallback: T): T {
 }
 
 function getCategories(qc: QueryClient): Category[] {
-  return readFile<CategoriesFile>(qc, 'categories.json', { categories: [] }).categories
+  return readFile<CategoriesFile>(qc, FINANCE_PATHS.categories, { categories: [] }).categories
 }
 
 function getAccounts(qc: QueryClient): Account[] {
-  return readFile<AccountsFile>(qc, 'accounts.json', { accounts: [] }).accounts
+  return readFile<AccountsFile>(qc, FINANCE_PATHS.accounts, { accounts: [] }).accounts
 }
 
 function getMonths(qc: QueryClient): string[] {
@@ -56,10 +64,30 @@ function getAllTransactions(qc: QueryClient): Transaction[] {
   return getMonths(qc).flatMap((m) => readFile<Transaction[]>(qc, transactionsPath(m), []))
 }
 
+async function loadAllWorkouts(): Promise<WorkoutSession[]> {
+  const files = await listDir(FITNESS_PATHS.workoutsDir)
+  const months = files.map((f) => f.name.replace(/\.json$/, '')).filter((n) => /^\d{4}-\d{2}$/.test(n))
+  const all: WorkoutSession[] = []
+  for (const month of months) {
+    all.push(...(await loadFile<WorkoutSession[]>(FITNESS_PATHS.workouts(month), [])))
+  }
+  return all.sort((a, b) => (a.date < b.date ? -1 : 1))
+}
+
+function fitnessOverview(qc: QueryClient): string {
+  const profile = readFile<FitnessProfile | null>(qc, FITNESS_PATHS.profile, null)
+  const plan = readFile<PlanFile>(qc, FITNESS_PATHS.plan, { next: null })
+  if (!profile) return 'Fitness: not set up (no training profile yet — it lives on the fitness Plan page).'
+  const planLine = plan.next
+    ? `next workout ready: "${plan.next.name}" with ${plan.next.exercises.length} exercises`
+    : 'no workout planned right now'
+  return `Fitness: goal ${profile.goal}, intends ${profile.daysPerWeek} sessions/week; ${planLine}.`
+}
+
 export function buildOverview(qc: QueryClient): string {
   const accounts = getAccounts(qc)
   const categories = getCategories(qc)
-  const budgets = readFile<BudgetsFile>(qc, 'budgets.json', { monthlyLimits: {}, overrides: {} })
+  const budgets = readFile<BudgetsFile>(qc, FINANCE_PATHS.budgets, { monthlyLimits: {}, overrides: {} })
   const allTx = getAllTransactions(qc)
   const month = currentMonthKey()
   const monthTx = allTx.filter((t) => t.date.startsWith(month))
@@ -86,19 +114,25 @@ This month (${month}): income ₹${t.income.toLocaleString('en-IN')}, spent ₹$
 Accounts:
 ${accountLines || '(none)'}
 Categories:
-${categoryLines || '(none)'}`
+${categoryLines || '(none)'}
+${fitnessOverview(qc)}`
 }
 
 // ---- Tool declarations (provider-neutral; adapters convert the schemas) ----
 
 const PAGES: Record<string, string> = {
-  dashboard: '/',
-  activity: '/transactions',
-  transactions: '/transactions',
-  budgets: '/budgets',
-  categories: '/categories',
-  import: '/import',
+  home: '/',
+  dashboard: '/finance',
+  activity: '/finance/transactions',
+  transactions: '/finance/transactions',
+  budgets: '/finance/budgets',
+  categories: '/finance/categories',
+  import: '/finance/import',
   settings: '/settings',
+  workout: '/fitness',
+  exercises: '/fitness/exercises',
+  'workout-history': '/fitness/history',
+  plan: '/fitness/plan',
 }
 
 export const functionDeclarations: ToolDef[] = [
@@ -264,12 +298,58 @@ export const functionDeclarations: ToolDef[] = [
     },
   },
   {
+    name: 'get_workout_history',
+    description:
+      'List logged gym sessions (newest last): date, name, per-exercise sets with reps and kg, session volume. Use for questions like "what did I bench last week".',
+    parameters: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'max sessions, default 10' },
+        exercise: { type: 'string', description: 'filter to exercises whose name contains this' },
+      },
+    },
+  },
+  {
+    name: 'log_workout',
+    description:
+      'Log a completed gym workout from informal text, e.g. "bench 3x8 60kg, squats 5x5 80". Records it as done today.',
+    parameters: {
+      type: 'object',
+      properties: { log: { type: 'string', description: 'the workout in the user\'s words' } },
+      required: ['log'],
+    },
+  },
+  {
+    name: 'generate_next_workout',
+    description:
+      'Build the next AI-programmed workout from the user\'s training profile and history, and set it as the plan. Optionally pass a special request ("make it a leg day", "something short").',
+    parameters: {
+      type: 'object',
+      properties: { request: { type: 'string', description: 'optional user preference for this workout' } },
+    },
+  },
+  {
     name: 'navigate',
     description: 'Take the user to a page of the app.',
     parameters: {
       type: 'object',
       properties: {
-        page: { type: 'string', enum: ['dashboard', 'activity', 'budgets', 'categories', 'import', 'settings'] },
+        page: {
+          type: 'string',
+          enum: [
+            'home',
+            'dashboard',
+            'activity',
+            'budgets',
+            'categories',
+            'import',
+            'settings',
+            'workout',
+            'exercises',
+            'workout-history',
+            'plan',
+          ],
+        },
       },
       required: ['page'],
     },
@@ -493,6 +573,66 @@ export async function executeTool(name: string, args: Args, ctx: ToolContext): P
       })
       ctx.onAction({ label: `Updated account ${acc.name}`, undo: () => actions.updateAccount(qc, acc.id, previous) })
       return { ok: true }
+    }
+
+    case 'get_workout_history': {
+      const limit = Math.min(Number(args.limit) || 10, 50)
+      let sessions = await loadAllWorkouts()
+      if (args.exercise) {
+        const q = String(args.exercise).toLowerCase()
+        sessions = sessions
+          .map((s) => ({ ...s, exercises: s.exercises.filter((e) => e.name.toLowerCase().includes(q)) }))
+          .filter((s) => s.exercises.length > 0)
+      }
+      sessions = sessions.slice(-limit)
+      return {
+        count: sessions.length,
+        sessions: sessions.map((s) => ({
+          date: s.date,
+          name: s.name,
+          volumeKg: Math.round(sessionVolume(s)),
+          exercises: s.exercises.map((e) => ({
+            name: e.name,
+            sets: e.sets.map((x) => (x.done ? `${x.reps ?? x.targetReps}@${x.weight ?? x.targetWeight ?? 'bw'}` : 'skipped')),
+          })),
+        })),
+      }
+    }
+
+    case 'log_workout': {
+      const log = String(args.log ?? '').trim()
+      if (!log) return { error: 'empty log' }
+      const exercises = await fetchExercises()
+      const session = await parseQuickLog(log, exercises)
+      saveSession(qc, session)
+      ctx.onAction({
+        label: `Logged workout: ${session.exercises.map((e) => `${e.name} ${setSummary(e.sets)}`).join(', ')}`,
+        undo: () => deleteSession(qc, session),
+      })
+      return { ok: true, logged: session.exercises.map((e) => ({ name: e.name, sets: e.sets.length })) }
+    }
+
+    case 'generate_next_workout': {
+      const profile = readFile<FitnessProfile | null>(qc, FITNESS_PATHS.profile, null)
+      if (!profile) {
+        return { error: 'no training profile yet — send the user to the fitness Plan page to set one up' }
+      }
+      const [exercises, history] = await Promise.all([fetchExercises(), loadAllWorkouts()])
+      const workout = await generateNextWorkout({
+        profile,
+        history,
+        exercises,
+        request: args.request ? String(args.request) : undefined,
+      })
+      savePlan(qc, { next: workout, generatedAt: new Date().toISOString() })
+      ctx.onAction({
+        label: `Planned "${workout.name}": ${workout.exercises.map((e) => e.name).join(', ')}`,
+        undo: () => savePlan(qc, { next: null }),
+      })
+      return {
+        ok: true,
+        workout: { name: workout.name, exercises: workout.exercises.map((e) => `${e.name} ${setSummary(e.sets)}`) },
+      }
     }
 
     case 'navigate': {

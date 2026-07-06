@@ -5,12 +5,12 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { ChevronRight, Tags } from 'lucide-react'
-import { clearFileCache, getConfig, setConfig } from '../lib/cache'
-import { flush, resetAllData } from '../lib/sync'
-import { useSyncState } from '../hooks/useSyncState'
-import { makeAccountId, useAccounts, useCategories, useFileQuery } from '../hooks/useData'
-import { accountTypeEmoji, accountTypeLabel } from '../lib/accounts'
-import { AI_MEMORY_PATH, emptyAiMemory, type AiMemoryFile } from '../lib/aiMemory'
+import { clearFileCache, getConfig, setConfig } from '@/lib/cache'
+import { flush, resetAllData } from '@/lib/sync'
+import { useSyncState } from '@/hooks/useSyncState'
+import { makeAccountId, useAccounts, useCategories, useFileQuery } from '@/hooks/useData'
+import { accountTypeEmoji, accountTypeLabel } from '@/lib/accounts'
+import { AI_MEMORY_PATH, emptyAiMemory, type AiMemoryFile } from '@/lib/aiMemory'
 import {
   activeProvider,
   DEFAULT_MODEL,
@@ -19,8 +19,8 @@ import {
   PROVIDER_LABEL,
   PROVIDERS,
   type Provider,
-} from '../lib/llm'
-import type { AccountType } from '../lib/types'
+} from '@/lib/llm'
+import type { AccountType } from '@/lib/types'
 
 const KEY_PLACEHOLDER: Record<Provider, string> = {
   gemini: 'AIza…',

@@ -3,10 +3,10 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { getConfig, setConfig } from '../lib/cache'
-import { validateToken } from '../lib/github'
-import { keyConfigFor, PROVIDER_LABEL, PROVIDERS, type Provider } from '../lib/llm'
-import { ensureSeedFiles } from '../lib/sync'
+import { getConfig, setConfig } from '@/lib/cache'
+import { validateToken } from '@/lib/github'
+import { keyConfigFor, PROVIDER_LABEL, PROVIDERS, type Provider } from '@/lib/llm'
+import { ensureSeedFiles } from '@/lib/sync'
 
 const KEY_HELP: Record<Provider, { label: string; href: string }> = {
   gemini: { label: 'aistudio.google.com/apikey (free)', href: 'https://aistudio.google.com/apikey' },

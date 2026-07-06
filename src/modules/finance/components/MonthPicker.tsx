@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { addMonths, currentMonthKey, monthLabel } from '../lib/dates'
+import { addMonths, currentMonthKey, monthLabel } from '@/lib/dates'
 
 interface Props {
   month: string

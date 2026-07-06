@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import BudgetCard from '../components/BudgetCard'
-import MonthPicker from '../components/MonthPicker'
-import { categoryDisplayName } from '../lib/categories'
-import { effectiveLimit, useBudgets, useCategories } from '../hooks/useData'
-import { useTransactions } from '../hooks/useTransactions'
-import { currentMonthKey } from '../lib/dates'
-import { spentByCategory } from '../lib/stats'
+import BudgetCard from '@/modules/finance/components/BudgetCard'
+import MonthPicker from '@/modules/finance/components/MonthPicker'
+import { categoryDisplayName } from '@/lib/categories'
+import { effectiveLimit, useBudgets, useCategories } from '@/hooks/useData'
+import { useTransactions } from '@/hooks/useTransactions'
+import { currentMonthKey } from '@/lib/dates'
+import { spentByCategory } from '@/lib/stats'
 
 export default function BudgetsPage() {
   const [month, setMonth] = useState(currentMonthKey())

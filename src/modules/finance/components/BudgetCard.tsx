@@ -2,10 +2,10 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
-import { Amount } from './Amount'
-import { categoryColor, categoryIcon } from '../lib/categoryIcon'
-import { formatINR } from '../lib/money'
-import type { Category } from '../lib/types'
+import { Amount } from '@/components/Amount'
+import { categoryColor, categoryIcon } from '@/lib/categoryIcon'
+import { formatINR } from '@/lib/money'
+import type { Category } from '@/lib/types'
 
 interface Props {
   category: Category

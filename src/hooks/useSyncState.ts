@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { subscribeSync, getSyncState } from '../lib/sync'
+import { subscribeSync, getSyncState } from '@/lib/sync'
 
 export function useSyncState() {
   return useSyncExternalStore(

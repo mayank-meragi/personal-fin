@@ -4,9 +4,9 @@ import { useQueryClient } from '@tanstack/react-query'
 import { ArrowUp, Check, RotateCcw, Sparkles, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { runAgentTurn, type ChatMessage } from '../lib/assistant/agent'
-import type { AgentAction } from '../lib/assistant/tools'
-import { AiError, hasAiKey, NoAiKeyError } from '../lib/ai'
+import { runAgentTurn, type ChatMessage } from '@/lib/assistant/agent'
+import type { AgentAction } from '@/lib/assistant/tools'
+import { AiError, hasAiKey, NoAiKeyError } from '@/lib/ai'
 
 type ChatItem =
   | { kind: 'text'; id: string; role: 'user' | 'assistant'; text: string }
@@ -20,8 +20,8 @@ interface PendingConfirm {
 const SUGGESTIONS = [
   'What have I spent this month?',
   'Add tea 20 from hdfc',
-  'Set my food budget to 6000',
-  'Which account has the most money?',
+  'Generate my next workout',
+  'Log bench 3x8 at 60kg',
 ]
 
 export default function Assistant() {
