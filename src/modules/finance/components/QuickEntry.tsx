@@ -21,6 +21,7 @@ import { AI_MEMORY_PATH, emptyAiMemory, maybeRefreshAiMemory, type AiMemoryFile 
 import { routeEntry } from '@/lib/entryRouter'
 import { saveSession } from '@/modules/fitness/lib/data'
 import { saveMeal, saveMetric, saveSleep } from '@/modules/health/lib/data'
+import { saveTask } from '@/modules/journal/lib/data'
 import { groupedCategories } from '@/lib/categories'
 import { categoryColor, categoryIcon, TRANSFER_COLOR } from '@/lib/categoryIcon'
 import { todayISO } from '@/lib/dates'
@@ -152,6 +153,14 @@ export default function QuickEntry({ universal = false }: Props) {
               saveMetric(queryClient, routed.metric)
               setNotice(`Logged weight: ${routed.metric.weightKg} kg`)
               break
+            case 'task': {
+              saveTask(queryClient, routed.task)
+              const due = routed.task.dueDate
+                ? ` · due ${routed.task.dueDate}${routed.task.dueTime ? ` ${routed.task.dueTime}` : ''}`
+                : ''
+              setNotice(`Added task: ${routed.task.text}${due}`)
+              break
+            }
           }
           setText('')
           clearImage()
@@ -296,7 +305,7 @@ export default function QuickEntry({ universal = false }: Props) {
           className="min-w-0 flex-1 bg-transparent text-[15px] text-[var(--text-strong)] outline-none placeholder:text-[var(--text-subtle)]"
           placeholder={
             universal
-              ? 'Add anything — "auto 85", "2 rotis", "slept 11 to 7"…'
+              ? 'Add anything — "auto 85", "2 rotis", "call bank tomorrow"…'
               : hasAiKey()
                 ? 'Add anything — "auto 85", "23k left in hdfc"…'
                 : 'Add anything — "tea 10"…'

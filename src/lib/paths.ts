@@ -29,4 +29,10 @@ export const HEALTH_PATHS = {
   targets: 'health/targets.json',
 } as const
 
+export const JOURNAL_PATHS = {
+  entries: (month: string) => `journal/entries/${month}.json`,
+  entriesDir: 'journal/entries',
+  tasks: 'journal/tasks.json',
+} as const
+
 export const SETTINGS_PATH = 'settings.json'

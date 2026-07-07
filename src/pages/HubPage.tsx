@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom'
-import { ArrowLeftRight, Dumbbell } from 'lucide-react'
+import { ArrowLeftRight, ChevronRight, Dumbbell } from 'lucide-react'
 import BriefingCard from '@/components/BriefingCard'
 import QuickEntry from '@/modules/finance/components/QuickEntry'
 import HealthCard from '@/modules/health/components/HealthCard'
+import { TodayTasks } from '@/modules/journal/components/tasks'
 import { Amount } from '@/components/Amount'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -156,6 +157,14 @@ export default function HubPage() {
       {/* Today */}
       <section className="space-y-2">
         <h2 className="font-display text-lg font-bold text-[var(--text-strong)]">Today</h2>
+        <QuickEntry universal />
+        <Card className="gap-2 p-3.5">
+          <Link to="/journal/tasks" className="flex items-center justify-between">
+            <p className="perfin-eyebrow text-[var(--text-subtle)]">Tasks</p>
+            <ChevronRight className="size-4 text-muted-foreground" />
+          </Link>
+          <TodayTasks />
+        </Card>
         <Card className="flex-row items-center gap-3 p-3.5">
           <IconTile color="var(--viz-1)">
             <Dumbbell className="size-5" />
@@ -168,7 +177,6 @@ export default function HubPage() {
             <Link to={workoutLine.to}>{workoutLine.cta}</Link>
           </Button>
         </Card>
-        <QuickEntry universal />
       </section>
 
       {/* Recent activity */}

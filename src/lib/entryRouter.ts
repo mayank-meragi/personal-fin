@@ -5,6 +5,8 @@ import { parseQuickLog } from '@/modules/fitness/lib/planner'
 import type { WorkoutSession } from '@/modules/fitness/lib/types'
 import { parseMeal } from '@/modules/health/lib/nutrition'
 import type { BodyMetric, Meal, SleepEntry } from '@/modules/health/lib/types'
+import { parseTask } from '@/modules/journal/lib/ai'
+import type { Task } from '@/modules/journal/lib/types'
 
 export type RoutedEntry =
   | { kind: 'money' }
@@ -12,9 +14,10 @@ export type RoutedEntry =
   | { kind: 'workout'; session: WorkoutSession }
   | { kind: 'sleep'; entry: SleepEntry }
   | { kind: 'weight'; metric: BodyMetric }
+  | { kind: 'task'; task: Task }
 
 interface Classification {
-  kind: 'money' | 'food' | 'workout' | 'sleep' | 'weight'
+  kind: 'money' | 'food' | 'workout' | 'sleep' | 'weight' | 'task'
   // Extraction fields arrive as strings: number-typed optional fields tempt the
   // model into degenerate literals (weightKg: 0.000000… until the token cap)
   hours?: string | number
@@ -72,13 +75,16 @@ export async function routeEntry(text: string, image?: ImageAttachment): Promise
   Also extract: hours (or bedTime/wakeTime as HH:MM 24h), and quality 1-5 when a feeling is
   stated — "felt great/amazing"=5, "slept well"=4, "ok"=3, "poorly/restless"=2, "terrible/rough"=1.
 - weight: body weight ("weight 72.4", "72.4kg today", "waist 84"). Extract weightKg/waistCm.
+- task: a to-do — an intention to do something later, not a record of something that
+  happened ("call the bank tomorrow", "sort hyderabad marketing monday 11am", "buy a
+  gift for mom").
 When genuinely torn between money and food, prices win: money.`,
     text: text || 'Classify the attached image.',
     image,
     schema: {
       type: 'object',
       properties: {
-        kind: { type: 'string', enum: ['money', 'food', 'workout', 'sleep', 'weight'] },
+        kind: { type: 'string', enum: ['money', 'food', 'workout', 'sleep', 'weight', 'task'] },
         hours: { type: 'string', description: 'number as text, e.g. "7.5"; omit unless sleep' },
         bedTime: { type: 'string' },
         wakeTime: { type: 'string' },
@@ -99,7 +105,7 @@ When genuinely torn between money and food, prices win: money.`,
     // Truncated/degenerate JSON — salvage field-by-field before giving up
     const grab = (key: string) => new RegExp(`"${key}"\\s*:\\s*"?([0-9A-Za-z:.]+)"?`).exec(raw)?.[1]
     const kind = grab('kind') as Classification['kind'] | undefined
-    if (!kind || !['money', 'food', 'workout', 'sleep', 'weight'].includes(kind)) return { kind: 'money' }
+    if (!kind || !['money', 'food', 'workout', 'sleep', 'weight', 'task'].includes(kind)) return { kind: 'money' }
     c = {
       kind,
       hours: grab('hours'),
@@ -135,6 +141,23 @@ When genuinely torn between money and food, prices win: money.`,
           bedTime,
           wakeTime,
           quality: Number(c.quality) >= 1 && Number(c.quality) <= 5 ? Math.round(Number(c.quality)) : undefined,
+        },
+      }
+    }
+
+    case 'task': {
+      // Delegate to the focused parser (same pattern as food/workout) — the
+      // multi-kind schema above makes flash drop/garble the date fields
+      const parsed = await parseTask(text)
+      if (!parsed.text) return { kind: 'money' }
+      return {
+        kind: 'task',
+        task: {
+          id: crypto.randomUUID(),
+          text: parsed.text,
+          dueDate: parsed.dueDate,
+          dueTime: parsed.dueTime,
+          createdAt: new Date().toISOString(),
         },
       }
     }
