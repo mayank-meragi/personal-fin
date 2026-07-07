@@ -5,6 +5,7 @@ import { openaiAdapter } from './openai'
 import { NoAiKeyError, type ChatRequest, type ChatResponse, type JsonRequest, type LlmAdapter, type Provider } from './types'
 
 export * from './types'
+export * from './usage'
 
 export const PROVIDERS: Provider[] = ['gemini', 'openai', 'anthropic']
 

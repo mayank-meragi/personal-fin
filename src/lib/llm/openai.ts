@@ -10,6 +10,7 @@ import {
   type LlmAdapter,
   type ToolCall,
 } from './types'
+import { recordUsage } from './usage'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type OpenAiMessage = Record<string, any>
@@ -20,7 +21,7 @@ function isReasoningModel(model: string): boolean {
   return /^(gpt-5|o\d)/.test(model)
 }
 
-async function request(body: object, key: string): Promise<OpenAiMessage> {
+async function request(body: { model: string } & Record<string, unknown>, key: string): Promise<OpenAiMessage> {
   let res: Response
   try {
     res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -45,6 +46,7 @@ async function request(body: object, key: string): Promise<OpenAiMessage> {
     throw new AiError(detail ? `OpenAI: ${detail}` : `OpenAI returned ${res.status}`)
   }
   const json = await res.json()
+  if (json.usage) recordUsage('openai', body.model, json.usage.prompt_tokens ?? 0, json.usage.completion_tokens ?? 0)
   const message = json.choices?.[0]?.message
   if (!message) throw new AiError('OpenAI returned no content')
   return message

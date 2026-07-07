@@ -4,23 +4,26 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { ChevronRight, Tags } from 'lucide-react'
+import { ChevronRight, Landmark, Tags } from 'lucide-react'
 import { clearFileCache, getConfig, setConfig } from '@/lib/cache'
 import { flush, resetAllData } from '@/lib/sync'
 import { useSyncState } from '@/hooks/useSyncState'
-import { makeAccountId, useAccounts, useCategories, useFileQuery } from '@/hooks/useData'
-import { accountTypeEmoji, accountTypeLabel } from '@/lib/accounts'
+import { useAccounts, useCategories, useFileQuery } from '@/hooks/useData'
 import { AI_MEMORY_PATH, emptyAiMemory, type AiMemoryFile } from '@/lib/aiMemory'
 import {
   activeProvider,
   DEFAULT_MODEL,
+  estimateCostUsd,
+  formatTokens,
+  formatUsd,
+  getUsage,
   keyConfigFor,
   modelConfigFor,
   PROVIDER_LABEL,
   PROVIDERS,
+  resetUsage,
   type Provider,
 } from '@/lib/llm'
-import type { AccountType } from '@/lib/types'
 
 const KEY_PLACEHOLDER: Record<Provider, string> = {
   gemini: 'AIza…',
@@ -37,15 +40,13 @@ const KEY_URL: Record<Provider, { label: string; href: string }> = {
 export default function SettingsPage() {
   const queryClient = useQueryClient()
   const sync = useSyncState()
-  const { accounts, addAccounts, updateAccount } = useAccounts()
+  const { accounts } = useAccounts()
   const [provider, setProvider] = useState<Provider>(activeProvider)
   const [aiKey, setAiKey] = useState(() => getConfig(keyConfigFor(activeProvider())) ?? '')
   const [aiModel, setAiModel] = useState(() => getConfig(modelConfigFor(activeProvider())) ?? '')
   const [saved, setSaved] = useState<string | null>(null)
-  const [newName, setNewName] = useState('')
-  const [newType, setNewType] = useState<AccountType>('bank')
-  const [newBalance, setNewBalance] = useState('')
   const [resetting, setResetting] = useState(false)
+  const [usage, setUsage] = useState(getUsage)
   const { data: aiMemory } = useFileQuery<AiMemoryFile>(AI_MEMORY_PATH, emptyAiMemory)
   const { categories } = useCategories()
 
@@ -111,95 +112,22 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Accounts</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="divide-y">
-            {accounts.map((acc) => {
-              const isCard = acc.type === 'credit-card'
-              return (
-                <div key={acc.id} className="flex flex-wrap items-center gap-2 py-2">
-                  <span className="text-lg">{accountTypeEmoji[acc.type]}</span>
-                  <Input
-                    className="h-8 min-w-0 flex-1"
-                    value={acc.name}
-                    onChange={(e) => updateAccount(acc.id, { name: e.target.value })}
-                  />
-                  <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    {isCard ? 'owes ₹' : 'start ₹'}
-                    <Input
-                      className="h-8 w-28 text-right tabular-nums"
-                      type="number"
-                      step="0.01"
-                      min={isCard ? '0' : undefined}
-                      value={isCard ? Math.abs(acc.startingBalance) : acc.startingBalance}
-                      onChange={(e) => {
-                        const v = Number(e.target.value) || 0
-                        updateAccount(acc.id, { startingBalance: isCard ? -Math.abs(v) : v })
-                      }}
-                    />
-                  </label>
-                </div>
-              )
-            })}
+      <Link to="/finance/accounts" className="block">
+        <Card className="flex-row items-center gap-3 p-4 transition-transform active:scale-[0.99]">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--surface-sunken)] text-[var(--text-muted)]">
+            <Landmark className="size-[18px]" strokeWidth={2} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-[var(--text-strong)]">Accounts</p>
+            <p className="truncate text-xs text-muted-foreground">
+              {accounts.length} account{accounts.length === 1 ? '' : 's'} · rename, edit balances, add new
+            </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 border-t pt-3">
-            <Input
-              className="h-8 min-w-0 flex-1"
-              placeholder="New account name"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-            />
-            <select
-              className="h-8 rounded-md border border-input bg-background px-2 text-sm shadow-xs"
-              value={newType}
-              onChange={(e) => setNewType(e.target.value as AccountType)}
-            >
-              {(Object.keys(accountTypeLabel) as AccountType[]).map((t) => (
-                <option key={t} value={t}>
-                  {accountTypeEmoji[t]} {accountTypeLabel[t]}
-                </option>
-              ))}
-            </select>
-            <Input
-              className="h-8 w-28 text-right tabular-nums"
-              type="number"
-              step="0.01"
-              min={newType === 'credit-card' ? '0' : undefined}
-              placeholder={newType === 'credit-card' ? 'owe ₹' : 'balance ₹'}
-              value={newBalance}
-              onChange={(e) => setNewBalance(e.target.value)}
-            />
-            <Button
-              size="sm"
-              disabled={!newName.trim()}
-              onClick={() => {
-                let id = makeAccountId(newName)
-                if (accounts.some((a) => a.id === id)) id = `${id}-${accounts.length + 1}`
-                const magnitude = Number(newBalance) || 0
-                addAccounts([
-                  {
-                    id,
-                    name: newName.trim(),
-                    type: newType,
-                    startingBalance: newType === 'credit-card' ? -Math.abs(magnitude) : magnitude,
-                    createdAt: new Date().toISOString(),
-                  },
-                ])
-                setNewName('')
-                setNewBalance('')
-                note('Account added.')
-              }}
-            >
-              Add
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+        </Card>
+      </Link>
 
-      <Link to="/categories" className="block">
+      <Link to="/finance/categories" className="block">
         <Card className="flex-row items-center gap-3 p-4 transition-transform active:scale-[0.99]">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--surface-sunken)] text-[var(--text-muted)]">
             <Tags className="size-[18px]" strokeWidth={2} />
@@ -311,6 +239,62 @@ export default function SettingsPage() {
           >
             Save
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">AI usage</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {usage.length === 0 ? (
+            <p className="text-sm text-muted-foreground/70">No AI calls tracked yet.</p>
+          ) : (
+            <>
+              <div className="divide-y">
+                {usage.map((u) => {
+                  const cost = estimateCostUsd(u)
+                  return (
+                    <div key={`${u.provider}:${u.model}`} className="flex items-baseline gap-2 py-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{u.model}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {PROVIDER_LABEL[u.provider]} · {u.calls} call{u.calls === 1 ? '' : 's'} ·{' '}
+                          {formatTokens(u.inputTokens)} in / {formatTokens(u.outputTokens)} out
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-sm font-semibold tabular-nums">
+                        {cost === null ? '—' : formatUsd(cost)}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="flex items-baseline justify-between border-t pt-2">
+                <p className="text-sm font-semibold">Total (approx.)</p>
+                <span className="text-sm font-bold tabular-nums">
+                  {formatUsd(usage.reduce((sum, u) => sum + (estimateCostUsd(u) ?? 0), 0))}
+                </span>
+              </div>
+            </>
+          )}
+          <p className="text-xs text-muted-foreground/70">
+            Counted from provider responses and stored only in this browser. Costs are estimates at
+            list prices; models missing from the price table show —.
+          </p>
+          {usage.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                resetUsage()
+                setUsage([])
+                note('AI usage counters reset.')
+              }}
+            >
+              Reset counters
+            </Button>
+          )}
         </CardContent>
       </Card>
 

@@ -21,6 +21,7 @@ const REDIRECTS: Record<string, string> = {
   '/transactions': '/finance/transactions',
   '/budgets': '/finance/budgets',
   '/categories': '/finance/categories',
+  '/accounts': '/finance/accounts',
   '/import': '/finance/import',
 }
 

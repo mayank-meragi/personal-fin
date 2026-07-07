@@ -11,6 +11,7 @@ import DashboardPage from './pages/DashboardPage'
 import TransactionsPage from './pages/TransactionsPage'
 import BudgetsPage from './pages/BudgetsPage'
 import CategoriesPage from './pages/CategoriesPage'
+import AccountsPage from './pages/AccountsPage'
 import ImportPage from './pages/ImportPage'
 
 function FinanceCard() {
@@ -48,6 +49,7 @@ export const financeModule: ModuleDef = {
     { path: '/finance/transactions', element: TransactionsPage },
     { path: '/finance/budgets', element: BudgetsPage },
     { path: '/finance/categories', element: CategoriesPage },
+    { path: '/finance/accounts', element: AccountsPage },
     { path: '/finance/import', element: ImportPage },
   ],
   navItems: [

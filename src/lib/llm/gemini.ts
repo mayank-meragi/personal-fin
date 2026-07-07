@@ -8,6 +8,7 @@ import {
   type LlmAdapter,
   type ToolCall,
 } from './types'
+import { recordUsage } from './usage'
 
 /** One content part in a Gemini request/response (text, functionCall, …). */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -57,6 +58,16 @@ async function request(body: object, key: string, model: string): Promise<Gemini
   if (res.status === 429) throw new AiError('Gemini rate limit hit — try again in a minute.')
   if (!res.ok) throw new AiError(`Gemini returned ${res.status}`)
   const json = await res.json()
+  const usage = json.usageMetadata
+  if (usage) {
+    // Thought tokens bill as output even though they never reach the parts
+    recordUsage(
+      'gemini',
+      model,
+      usage.promptTokenCount ?? 0,
+      (usage.candidatesTokenCount ?? 0) + (usage.thoughtsTokenCount ?? 0),
+    )
+  }
   const parts: GeminiPart[] | undefined = json.candidates?.[0]?.content?.parts
   if (!parts || parts.length === 0) throw new AiError('Gemini returned no content')
   return parts

@@ -10,11 +10,12 @@ import {
   type LlmAdapter,
   type ToolCall,
 } from './types'
+import { recordUsage } from './usage'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ContentBlock = Record<string, any>
 
-async function request(body: object, key: string): Promise<ContentBlock[]> {
+async function request(body: { model: string } & Record<string, unknown>, key: string): Promise<ContentBlock[]> {
   let res: Response
   try {
     res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -45,6 +46,7 @@ async function request(body: object, key: string): Promise<ContentBlock[]> {
     throw new AiError(detail ? `Anthropic: ${detail}` : `Anthropic returned ${res.status}`)
   }
   const json = await res.json()
+  if (json.usage) recordUsage('anthropic', body.model, json.usage.input_tokens ?? 0, json.usage.output_tokens ?? 0)
   const content: ContentBlock[] | undefined = json.content
   if (!content || content.length === 0) throw new AiError('Anthropic returned no content')
   return content
